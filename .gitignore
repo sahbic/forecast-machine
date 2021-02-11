@@ -1,3 +1,12 @@
+.vscode
+
+# specific
+
+raw
+output
+/src/functions/*
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
