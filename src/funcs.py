@@ -6,6 +6,7 @@ import math, decimal
 from slugify import slugify
 
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error
 
 def get_moon_phase(d):  # 0=new, 4=full; 4 days/phase
     dec = decimal.Decimal
@@ -91,10 +92,10 @@ def shift_with_pred_horizon(df, dependent_var, predict_horizon):
     df["target"] = df[dependent_var].shift(-predict_horizon)
     return df
 
-def split(df, time_col, end_train_time, end_validation_time):
+def split(df, time_col, end_train_time, end_test_time):
     train = df[df[time_col] <= end_train_time]
-    validate = df[(df[time_col] > end_train_time) & (df[time_col] <= end_validation_time)]
-    return train, validate
+    test = df[(df[time_col] > end_train_time) & (df[time_col] <= end_test_time)]
+    return train, test
 
 def drop_constant_columns(df, log):
     dropped = []
@@ -152,3 +153,9 @@ def impute_missing_mean(train, val, num_cols, params, log):
 
     log.info("imputed numerical columns: "+str(len(float_cols)))
     return train_imp, val_imp
+
+
+def compute_metric(res, test, params):
+    res = res.merge(test[[params.id_col, params.time_col, params.dependent_var]], on=[params.id_col,params.time_col], how="left")
+    error = mean_squared_error(res["prediction"], res[params.dependent_var])
+    return error

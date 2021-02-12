@@ -1,4 +1,14 @@
-# forecast-accuracy
+# forecast-machine
+
+This aims to be a forecast tool, with the following features:
+- Various forecast methods:
+    - Time series statistical methods
+    - Forest ensemble algorithms
+    - Deep Learning approaches
+- Back-testing
+- Segmentation capabilities
+- Time segmentation for a more precise forecast
+
 
 ## How to run
 

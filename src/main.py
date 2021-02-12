@@ -6,6 +6,7 @@ import pickle
 import utils
 import funcs
 import algs
+from models import Mean, MeanTS
 
 # import m5a
 # project_key = 'm5a'
@@ -43,35 +44,49 @@ class myProgram(object):
             # self.params.update_file_path()
             end_train_time = pd.to_datetime(end_train_x)
             offset = get_offset(self.params.number_predictions)
-            end_validation_time = end_train_time + offset
-            self.log.info('train end date {} / validate date end {}'.format(str(end_train_time), str(end_validation_time)))
+            end_test_time = end_train_time + offset
+            self.log.info('train end date {} / test date end {}'.format(str(end_train_time), str(end_test_time)))
+            train_fold, test_fold = funcs.split(df, self.params.time_col, end_train_time, end_test_time)
         
             for predict_horizon in self.params.prediction_horizon_list:
                 self.log.info('-----------------', 'fold_id', end_train_x, 'predict_horizon', predict_horizon)
                 self.log.info('shift data')
                 shifted = funcs.shift_with_pred_horizon(df, self.params.dependent_var, predict_horizon)
 
+                res_segments = pd.DataFrame()
                 for segment in segments_list:
                     # split
                     self.log.info('split data')
                     if segment == "all":
-                        full_df = shifted.copy()
+                        part_df = shifted.copy()
                     else:
                         self.log.info('--------', 'segment', segment)
                         segmented = shifted[shifted[self.params.segment_groupby_column] == segment]
-                        full_df = segmented.copy()
+                        part_df = segmented.copy()
 
-                    num_cols, cat_cols = funcs.get_num_cat_columns(df, self.params, self.log)
-                    full_df_rf = funcs.preprocess_ml_sklearn_forests(full_df, cat_cols, self.params, self.log)
-                    train_rf, validate_rf = funcs.split(full_df_rf, self.params.time_col, end_train_time, end_validation_time)
-                    train_rf, validate_rf = funcs.impute_missing_mean(train_rf, validate_rf, num_cols, self.params, self.log)
-                    # train
-                    self.log.info('train')
-                    model_name = str(self.params.model_dir_path / f'lgb_model_{segment}_{predict_horizon}.bin')
-                    estimator = algs.train_rf_model(train_rf, self.params, self.log)
-                    pickle.dump(estimator, open(model_name, 'wb'))
+                    # num_cols, cat_cols = funcs.get_num_cat_columns(df, self.params, self.log)
+                    # full_df_rf = funcs.preprocess_ml_sklearn_forests(part_df, cat_cols, self.params, self.log)
+                    # train_rf, validate_rf = funcs.split(full_df_rf, self.params.time_col, end_train_time, end_test_time)
+                    # train_rf, validate_rf = funcs.impute_missing_mean(train_rf, validate_rf, num_cols, self.params, self.log)
+                    # # train
+                    # self.log.info('train')
+                    # model_name = str(self.params.model_dir_path / f'lgb_model_{segment}_{predict_horizon}.bin')
+                    # estimator = algs.train_rf_model(train_rf, self.params, self.log)
+                    # pickle.dump(estimator, open(model_name, 'wb'))
                     # evaluate
                     # res = algs.predict_rf_model(validate_rf, self.params, self.log)
+
+
+                    train, test = funcs.split(part_df, self.params.time_col, end_train_time, end_test_time)
+
+                    estimator = MeanTS(self.params.id_col, self.params.time_col, self.params.dependent_var)
+                    estimator.fit(train)
+                    res = estimator.predict(test)
+                    res_segments = pd.concat([res_segments, res])
+
+                error = funcs.compute_metric(res_segments, test_fold, self.params)
+                self.log.info('fold_id', end_train_x, 'error', error)
+
                 
                 # temp_path = str(self.params.work_dir_path / "temp.csv")
                 # shifted.to_csv(temp_path, index=False)
