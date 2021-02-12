@@ -77,8 +77,11 @@ class Params(object):
         self.work_dir_path.mkdir(parents=True, exist_ok=True)
 
         self.time_col = setting['time_col']
-        self.number_predictions = setting['number_predictions']
-        self.n_predictions_groupby = setting['n_predictions_groupby']
+        self.id_col = setting['id_col']
+        self.dependent_var = setting['dependent_var']
+        self.number_predictions = int(setting['number_predictions'])
+        self.n_predictions_groupby = int(setting['n_predictions_groupby'])
+        self.segment_groupby_column = setting['segment_groupby_column']
 
         if self.number_predictions % self.n_predictions_groupby != 0:
             self.log.warning("number_predictions must be a multiple of n_predictions_groupby. n_predictions_groupby is set to be equal to number_predictions (no time grouping)")
