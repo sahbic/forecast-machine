@@ -108,7 +108,6 @@ def split_with_time_grouping(df, time_col, end_train_time, begin_test_time, end_
     test = df[(df[time_col] >= begin_test_time) & (df[time_col] <= end_test_time)]
     return train, test
 
-
 def drop_constant_columns(df, log):
     dropped = []
     for col in df.columns:
@@ -118,54 +117,12 @@ def drop_constant_columns(df, log):
     log.info("dropped categories: "+str(len(dropped)))
     return df
 
-def one_hot_encode_categorical_columns(df, cat_cols, log):
-    non_constant_cat = [cat for cat in cat_cols if cat in df.columns]
-    for category in non_constant_cat:
-        df[category] = df[category].apply(lambda x :slugify(x))
-    
-    df = pd.get_dummies(df, columns=non_constant_cat)
-    df.columns = [x.replace("-", "_") for x in df.columns]
-    log.info("encoded categories: "+str(len(non_constant_cat)))
-    return df
-
 def get_num_cat_columns(df, params, log):
-    cols = df.columns
+    cols = df.drop(columns=[params.id_col, params.time_col, params.dependent_var], axis=1).columns
     num_cols = df._get_numeric_data().columns
     cat_cols = list(set(cols) - set(num_cols))
-    # remove time and id from categorical
-    cat_cols.remove(params.time_col)
-    cat_cols.remove(params.id_col)
-    # remove dependant variable from numerical
     num_cols = list(set(num_cols))
-    num_cols.remove(params.dependent_var)
-    # num_cols.remove("target")
     return num_cols, cat_cols
-
-def preprocess_ml_sklearn_forests(df, cat_cols, params, log):
-    df = drop_constant_columns(df, log)
-    # _, cat_cols = get_num_cat_columns(df, params, log)
-    df = one_hot_encode_categorical_columns(df, cat_cols, log)
-    return df
-
-def impute_missing_mean(train, val, num_cols, params, log):
-    # num_cols, _ = get_num_cat_columns(train, params, log)
-    float_cols = list(train.columns[(train.dtypes.values == np.dtype('float64'))])
-    float_cols.remove(params.dependent_var)
-    float_cols.remove("target")
-
-    mean_imputer = SimpleImputer()
-    a = mean_imputer.fit_transform(train.loc[:, float_cols])
-    b = mean_imputer.transform(val.loc[:, float_cols])
-
-    train_imp = train.copy()
-    val_imp = val.copy()
-
-    train_imp.loc[:, float_cols] = a
-    val_imp.loc[:, float_cols] = b
-
-    log.info("imputed numerical columns: "+str(len(float_cols)))
-    return train_imp, val_imp
-
 
 def compute_metric(res, test, params):
     res = res.merge(test[[params.id_col, params.time_col, params.dependent_var]], on=[params.id_col,params.time_col], how="left")

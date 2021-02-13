@@ -4,11 +4,11 @@ import datetime
 import pickle
 
 import pandas as pd
+import numpy as np
 
 import utils
 import funcs
-import algs
-from models import Mean, MeanTS, Last
+from models import Mean, MeanTS, Last, RandomForest
 
 # import m5a
 # project_key = 'm5a'
@@ -38,6 +38,7 @@ class myProgram(object):
         else:
             segments_list = ["all"]
 
+        scores = []
         for end_train_x in self.params.end_train_x_list:
             self.params.end_train_x = end_train_x
             self.params.result_dir_path = result_dir_org_path / str(end_train_x)
@@ -74,36 +75,30 @@ class myProgram(object):
                         part_df = segmented.copy()
                         self.log.info('segment shape '+ str(part_df.shape))
 
-                    # num_cols, cat_cols = funcs.get_num_cat_columns(df, self.params, self.log)
-                    # full_df_rf = funcs.preprocess_ml_sklearn_forests(part_df, cat_cols, self.params, self.log)
-                    # train_rf, validate_rf = funcs.split(full_df_rf, self.params.time_col, end_train_time, end_test_time)
-                    # train_rf, validate_rf = funcs.impute_missing_mean(train_rf, validate_rf, num_cols, self.params, self.log)
-                    # # train
-                    # self.log.info('train')
-                    # model_name = str(self.params.model_dir_path / f'lgb_model_{segment}_{predict_horizon}.bin')
-                    # estimator = algs.train_rf_model(train_rf, self.params, self.log)
-                    # pickle.dump(estimator, open(model_name, 'wb'))
-                    # evaluate
-                    # res = algs.predict_rf_model(validate_rf, self.params, self.log)
 
 
-                    # train, test = funcs.split(part_df, self.params.time_col, end_train_time, end_test_time)
+
+                    part_df = funcs.drop_constant_columns(part_df, self.log)
                     train, test = funcs.split_with_time_grouping(part_df, self.params.time_col, end_train_time, begin_test_time_group, end_test_time_group)
 
-                    estimator = Last(self.params.id_col, self.params.time_col, self.params.dependent_var, predict_horizon)
+                    estimator = RandomForest(self.params.id_col, self.params.time_col, self.params.dependent_var, self.log, predict_horizon)
                     estimator.fit(train)
                     res = estimator.predict(test)
+                    # collect results of segments
                     res_segments = pd.concat([res_segments, res])
                 
+                # collect results of time groups
                 res_tgroups = pd.concat([res_tgroups, res_segments])
 
+            # compute fold error
             self.log.info('test result shape'+ str(res_tgroups.shape))
             error = funcs.compute_metric(res_tgroups, test_fold, self.params)
             self.log.info('fold_id', end_train_x, 'error', error)
+            # compute fold results
+            scores.append(error)
 
-                
-                # temp_path = str(self.params.work_dir_path / "temp.csv")
-                # shifted.to_csv(temp_path, index=False)
+        cross_fold_error = np.mean(scores)
+        self.log.info('=> cross fold mean error', cross_fold_error)
 
 
         return

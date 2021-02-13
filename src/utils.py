@@ -42,16 +42,6 @@ class Log(object):
             messages = tuple(messages[0])
         return '\t'.join(map(str, messages))
 
-    # def log_evaluation(self, period=100, show_stdv=True, level=logging.INFO):
-    #     def _callback(env):
-    #         if period > 0 and env.evaluation_result_list and (env.iteration + 1) % period == 0:
-    #             result = '\t'.join(
-    #                 [lgb.callback._format_eval_result(x, show_stdv) for x in env.evaluation_result_list])
-    #             self.logger.log(level, '[{}]\t{}'.format(env.iteration + 1, result))
-
-    #     _callback.order = 10
-    #     return _callback
-
 
 class Params(object):
     def __init__(self, setting):
@@ -93,39 +83,11 @@ class Params(object):
         self.model_dir_path = self.output_dir_path / 'model'
         self.model_dir_path.mkdir(parents=True, exist_ok=True)
 
-        # self.seed = 42
-        # Util.set_seed(self.seed)
-
-        # self.sampling_rate = setting['sampling_rate']
-        # self.export_all_flag = False
-        # self.recursive_feature_flag = False
-
-        # self.target = 'sales'
-        # self.start_train_day_x = 1
-
         self.end_train_x_list = [str(fold_id) for fold_id in setting['fold_id_list_csv'].split(',')]
-        # self.end_train_default = self.end_train_x_list[0]
 
         for end_train_x in self.end_train_x_list:
             (self.result_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
             (self.work_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
             (self.model_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
-
-        # self.end_train_day_x = None
-
-        # self.prediction_horizon_list = [int(prediction_horizon) for prediction_horizon in
-        #                                 setting['prediction_horizon_list_csv'].split(',')]
-        # self.prediction_horizon = None
-        # self.prediction_horizon_prev = None
-
-        # self.main_index_list = ['id', 'd']
-
-        # self.remove_features = ['id', 'state_id', 'store_id', 'date', 'wm_yr_wk', 'd', self.target]
-        # self.enable_features = None
-        # self.mean_features = [
-        #     'enc_cat_id_mean', 'enc_cat_id_std',
-        #     'enc_dept_id_mean', 'enc_dept_id_std',
-        #     'enc_item_id_mean', 'enc_item_id_std'
-        # ]
 
         return
