@@ -3,10 +3,12 @@ import argparse
 import datetime
 import pickle
 
+import pandas as pd
+
 import utils
 import funcs
 import algs
-from models import Mean, MeanTS
+from models import Mean, MeanTS, Last
 
 # import m5a
 # project_key = 'm5a'
@@ -48,21 +50,29 @@ class myProgram(object):
             self.log.info('train end date {} / test date end {}'.format(str(end_train_time), str(end_test_time)))
             train_fold, test_fold = funcs.split(df, self.params.time_col, end_train_time, end_test_time)
         
+            res_tgroups = pd.DataFrame()
             for predict_horizon in self.params.prediction_horizon_list:
                 self.log.info('-----------------', 'fold_id', end_train_x, 'predict_horizon', predict_horizon)
+                begin_test_time_group = end_train_time + get_offset(predict_horizon - self.params.n_predictions_groupby + 1) 
+                end_test_time_group = end_train_time + get_offset(predict_horizon)
+                self.log.info('test begin', str(begin_test_time_group), 'test end', str(end_test_time_group))
+
                 self.log.info('shift data')
-                shifted = funcs.shift_with_pred_horizon(df, self.params.dependent_var, predict_horizon)
+                # shifted = funcs.shift_with_pred_horizon(df, self.params.dependent_var, predict_horizon)
+                shifted = funcs.add_last_value(df, self.params.id_col, self.params.dependent_var, predict_horizon)
 
                 res_segments = pd.DataFrame()
                 for segment in segments_list:
                     # split
-                    self.log.info('split data')
+                    # self.log.info('split data')
                     if segment == "all":
                         part_df = shifted.copy()
+                        self.log.info('data shape '+ str(part_df.shape))
                     else:
                         self.log.info('--------', 'segment', segment)
                         segmented = shifted[shifted[self.params.segment_groupby_column] == segment]
                         part_df = segmented.copy()
+                        self.log.info('segment shape '+ str(part_df.shape))
 
                     # num_cols, cat_cols = funcs.get_num_cat_columns(df, self.params, self.log)
                     # full_df_rf = funcs.preprocess_ml_sklearn_forests(part_df, cat_cols, self.params, self.log)
@@ -77,15 +87,19 @@ class myProgram(object):
                     # res = algs.predict_rf_model(validate_rf, self.params, self.log)
 
 
-                    train, test = funcs.split(part_df, self.params.time_col, end_train_time, end_test_time)
+                    # train, test = funcs.split(part_df, self.params.time_col, end_train_time, end_test_time)
+                    train, test = funcs.split_with_time_grouping(part_df, self.params.time_col, end_train_time, begin_test_time_group, end_test_time_group)
 
-                    estimator = MeanTS(self.params.id_col, self.params.time_col, self.params.dependent_var)
+                    estimator = Last(self.params.id_col, self.params.time_col, self.params.dependent_var, predict_horizon)
                     estimator.fit(train)
                     res = estimator.predict(test)
                     res_segments = pd.concat([res_segments, res])
+                
+                res_tgroups = pd.concat([res_tgroups, res_segments])
 
-                error = funcs.compute_metric(res_segments, test_fold, self.params)
-                self.log.info('fold_id', end_train_x, 'error', error)
+            self.log.info('test result shape'+ str(res_tgroups.shape))
+            error = funcs.compute_metric(res_tgroups, test_fold, self.params)
+            self.log.info('fold_id', end_train_x, 'error', error)
 
                 
                 # temp_path = str(self.params.work_dir_path / "temp.csv")

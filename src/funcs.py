@@ -92,10 +92,22 @@ def shift_with_pred_horizon(df, dependent_var, predict_horizon):
     df["target"] = df[dependent_var].shift(-predict_horizon)
     return df
 
+def add_last_value(df, id_col, dependent_var, predict_horizon):
+    var_name = "last_"+str(predict_horizon)
+    res = df.copy()
+    res[var_name] = df.groupby(id_col)[dependent_var].shift(predict_horizon)
+    return res
+
 def split(df, time_col, end_train_time, end_test_time):
     train = df[df[time_col] <= end_train_time]
     test = df[(df[time_col] > end_train_time) & (df[time_col] <= end_test_time)]
     return train, test
+
+def split_with_time_grouping(df, time_col, end_train_time, begin_test_time, end_test_time):
+    train = df[df[time_col] <= end_train_time]
+    test = df[(df[time_col] >= begin_test_time) & (df[time_col] <= end_test_time)]
+    return train, test
+
 
 def drop_constant_columns(df, log):
     dropped = []

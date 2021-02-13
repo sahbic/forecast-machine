@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
 
+import funcs
+
 class Model(object):
-    def __init__(self, id_col, time_col, dependent_var):
+    def __init__(self, id_col, time_col, dependent_var, predict_horizon):
         self.id_col = id_col
         self.time_col = time_col
         self.dependent_var = dependent_var
+        self.predict_horizon = predict_horizon
 
     def fit(self, train):
         pass
@@ -15,8 +18,8 @@ class Model(object):
  
 
 class Mean(Model):
-    def __init__(self, id_col, time_col, dependent_var):
-        Model.__init__(self, id_col, time_col, dependent_var)
+    def __init__(self, id_col, time_col, dependent_var, predict_horizon):
+        Model.__init__(self, id_col, time_col, dependent_var, predict_horizon)
         self.mean_value = None
 
     def fit(self, train):
@@ -29,8 +32,8 @@ class Mean(Model):
 
 
 class MeanTS(Model):
-    def __init__(self, id_col, time_col, dependent_var):
-        Model.__init__(self, id_col, time_col, dependent_var)
+    def __init__(self, id_col, time_col, dependent_var, predict_horizon):
+        Model.__init__(self, id_col, time_col, dependent_var, predict_horizon)
         self.means = None
 
     def fit(self, train):
@@ -43,13 +46,16 @@ class MeanTS(Model):
         return res
 
 
-# class Previous(Model):
-#     def __init__(self, id_col, time_col, dependent_var):
-#         Model.__init__(self, id_col, time_col, dependent_var)
-#         self.mean_value = None
+class Last(Model):
+    def __init__(self, id_col, time_col, dependent_var, predict_horizon):
+        Model.__init__(self, id_col, time_col, dependent_var, predict_horizon)
+        self.last = None
 
-#     def fit(self, train, target_column, predict_horizon):
-#         self.mean_value = train[target_column].mean()
+    def fit(self, train):
+        pass
 
-#     def predict(self, test):
-#         return self.mean_value*np.ones(len(test))
+    def predict(self, test):
+        var_name = "last_"+str(self.predict_horizon)
+        res = test.loc[:, [self.id_col, self.time_col, var_name]]
+        res.rename(columns={var_name:"prediction"}, inplace=True)
+        return res
