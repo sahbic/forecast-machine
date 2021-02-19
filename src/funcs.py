@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 
 def get_moon_phase(d):  # 0=new, 4=full; 4 days/phase
     dec = decimal.Decimal
-    diff = datetime.datetime.strptime(str(d), '%Y-%m-%d') - datetime.datetime(2001, 1, 1)
+    diff = d - datetime.datetime(2001, 1, 1)
     days = dec(diff.days) + (dec(diff.seconds) / dec(86400))
     lunations = dec("0.20439731") + (days * dec("0.03386319269"))
     phase_index = math.floor((lunations % dec(1) * dec(8)) + dec('0.5'))
@@ -52,7 +52,7 @@ def extract_time_features(df, time_col, id_col, log):
     all_freqs = ["nanosecond","microsecond","millisecond","second","minute","hour","day","week","month","quarter","year"]
     rank_freq = all_freqs.index(freq)
 
-    df["year"] = df[time_col].dt.year.astype(np.int8)
+    df["year"] = df[time_col].dt.year
 
     if rank_freq < all_freqs.index("year"):
         df["quarter"] = df[time_col].dt.quarter.astype(np.int8)
@@ -61,9 +61,9 @@ def extract_time_features(df, time_col, id_col, log):
         df["month"] = df[time_col].dt.month.astype(np.int8)
 
     if rank_freq < all_freqs.index("month"):
-        df["week"] = df[time_col].dt.week.astype(np.int8)
+        df["week"] = df[time_col].dt.isocalendar().week
         days = df[time_col].dt.day
-        df['weekmonth'] = days.apply(lambda x: ceil(x / 7)).astype(np.int8)
+        df['weekmonth'] = days.apply(lambda x: math.ceil(x / 7)).astype(np.int8)
 
     if rank_freq < all_freqs.index("week"):
         df["dayofweek"] = df[time_col].dt.dayofweek.astype(np.int8)
@@ -93,7 +93,7 @@ def shift_with_pred_horizon(df, dependent_var, predict_horizon):
     return df
 
 def add_last_value(df, id_col, dependent_var, predict_horizon):
-    var_name = "last_"+str(predict_horizon)
+    var_name = "last"
     res = df.copy()
     res[var_name] = df.groupby(id_col)[dependent_var].shift(predict_horizon)
     return res
@@ -114,7 +114,7 @@ def drop_constant_columns(df, log):
         if len(df[col].unique()) == 1:
             dropped.append(col)
             df = df.drop(col,axis=1)
-    log.info("dropped categories: "+str(len(dropped)))
+    log.info("dropped columns: "+str(len(dropped)))
     return df
 
 def get_num_cat_columns(df, params, log):

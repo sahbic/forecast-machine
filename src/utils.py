@@ -48,6 +48,7 @@ class Params(object):
         self.setting = setting
         self.data_dir_path = Path(setting['data_dir_path'])
 
+        self.project_key = setting['project_key']
         self.raw_dir_path = self.data_dir_path / 'raw' / setting['project_key']
         self.raw_dir_path.mkdir(parents=True, exist_ok=True)
 

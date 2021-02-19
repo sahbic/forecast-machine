@@ -9,11 +9,10 @@ from sklearn.impute import SimpleImputer
 from sklearn.compose import make_column_selector
 
 class Model(object):
-    def __init__(self, id_col, time_col, dependent_var, log, predict_horizon):
+    def __init__(self, id_col, time_col, dependent_var, log):
         self.id_col = id_col
         self.time_col = time_col
         self.dependent_var = dependent_var
-        self.predict_horizon = predict_horizon
         self.log = log
 
     def fit(self, train):
@@ -24,8 +23,8 @@ class Model(object):
  
 
 class Mean(Model):
-    def __init__(self, id_col, time_col, dependent_var, log, predict_horizon):
-        Model.__init__(self, id_col, time_col, dependent_var, log, predict_horizon)
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.mean_value = None
 
     def fit(self, train):
@@ -38,8 +37,8 @@ class Mean(Model):
 
 
 class MeanTS(Model):
-    def __init__(self, id_col, time_col, dependent_var, log, predict_horizon):
-        Model.__init__(self, id_col, time_col, dependent_var, log, predict_horizon)
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.means = None
 
     def fit(self, train):
@@ -53,23 +52,23 @@ class MeanTS(Model):
 
 
 class Last(Model):
-    def __init__(self, id_col, time_col, dependent_var, log, predict_horizon):
-        Model.__init__(self, id_col, time_col, dependent_var, log, predict_horizon)
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.last = None
 
     def fit(self, train):
         pass
 
     def predict(self, test):
-        var_name = "last_"+str(self.predict_horizon)
+        var_name = "last"
         res = test.loc[:, [self.id_col, self.time_col, var_name]]
         res.rename(columns={var_name:"prediction"}, inplace=True)
         return res
 
 
 class RandomForest(Model):
-    def __init__(self, id_col, time_col, dependent_var, log, predict_horizon):
-        Model.__init__(self, id_col, time_col, dependent_var, log, predict_horizon)
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.model = None
 
     def fit(self, df):
