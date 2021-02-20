@@ -7,6 +7,8 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.compose import make_column_selector
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import mean_squared_error, make_scorer
 
 class Model(object):
     def __init__(self, id_col, time_col, dependent_var, log):
@@ -54,10 +56,37 @@ class MeanTS(Model):
 class Last(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.name = "Last"
         self.last = None
+        self.best_params = None
+        self.best_index = None
+        self.cv_results = None
 
     def fit(self, train):
         pass
+
+    def tune_fit(self, train, splitter, n_iter):
+        pass
+
+        cv_results = {}
+        i = 0
+        scores = []
+        for train_idx, test_idx in splitter:
+            test = train.iloc[test_idx]
+            preds = self.predict(test)
+            preds = preds.fillna(0)
+
+            preds = preds.merge(test[[self.id_col, self.time_col, self.dependent_var]], on=[self.id_col,self.time_col], how="left")
+            res = mean_squared_error(preds["prediction"], preds[self.dependent_var])
+
+            cv_results['split'+str(i)+'_test_score'] = [res]
+            scores.append(res)
+            i = i+1
+
+        cv_results['split'+str(i)+'_test_score'] = [res]
+        cv_results["mean_test_score"] = [np.mean(scores)]
+        self.cv_results = cv_results
+        self.best_index = 0
 
     def predict(self, test):
         var_name = "last"
@@ -69,13 +98,19 @@ class Last(Model):
 class RandomForest(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.name = "RandomForest"
         self.model = None
+        self.best_params = None
+        self.best_index = None
+        self.parameters_space = {
+            'model__n_estimators': [50],
+            'model__max_features': ['auto', 'sqrt', 'log2'],
+            'model__min_samples_split': [2, 5, 10],
+            'model__max_depth' : [3,5,10,None],
+            'model__criterion' :['mse', 'mae']
+        }
 
-    def fit(self, df):
-
-        X = df.drop(columns=[self.id_col, self.time_col, self.dependent_var])
-        y = df[self.dependent_var]
-
+    def get_pipeline(self):
         # Define data pipelines
         numeric_transformer = Pipeline(steps=[
             ('imputer', SimpleImputer(strategy='median'))])
@@ -92,8 +127,43 @@ class RandomForest(Model):
         ('preprocessor', preprocessor),
         ('model', RandomForestRegressor(random_state=3))])
 
+        return rf_model
+
+    def fit(self, df):
+
+        X = df.drop(columns=[self.id_col, self.time_col, self.dependent_var])
+        y = df[self.dependent_var]
+
+        rf_model = self.get_pipeline()
+
         rf_model.fit(X, y)
         self.model = rf_model
+
+    def fit_with_params(self, df):
+
+        X = df.drop(columns=[self.id_col, self.time_col, self.dependent_var])
+        y = df[self.dependent_var]
+
+        rf_model = self.get_pipeline()
+        rf_model.set_params(**self.best_params)
+
+        rf_model.fit(X, y)
+        self.model = rf_model
+
+    def tune_fit(self, df, splitter, n_iter):
+
+        X = df.drop(columns=[self.id_col, self.time_col, self.dependent_var])
+        y = df[self.dependent_var]
+
+        rf_model = self.get_pipeline()
+
+        search = RandomizedSearchCV(rf_model, param_distributions=self.parameters_space, cv=splitter, scoring=make_scorer(mean_squared_error), n_iter=n_iter, n_jobs=-1)
+        search.fit(X, y)
+
+        self.model = search.best_estimator_
+        self.best_params = search.best_params_
+        self.cv_results = search.cv_results_
+        self.best_index = search.best_index_
 
     def predict(self, test):
         preds = self.model.predict(test.drop(columns=[self.id_col, self.time_col, self.dependent_var]))

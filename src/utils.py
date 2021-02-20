@@ -49,12 +49,13 @@ class Params(object):
         self.data_dir_path = Path(setting['data_dir_path'])
 
         self.project_key = setting['project_key']
+        self.n_folds = int(setting['n_folds'])
 
         self.raw_dir_path = self.data_dir_path / 'raw' / setting['project_key']
         self.raw_dir_path.mkdir(parents=True, exist_ok=True)
 
         self.output_name = Path(setting['output_name'])
-        self.output_dir_path = self.data_dir_path / 'output' / self.output_name
+        self.output_dir_path = self.data_dir_path / 'output' / self.output_name / setting['project_key']
         self.output_dir_path.mkdir(parents=True, exist_ok=True)
 
         self.log_name = setting['log_name']
@@ -63,8 +64,8 @@ class Params(object):
         self.log = Log(get_logger(self.log_name, self.log_dir_path))
 
         self.mode = setting['mode']
-        if self.mode not in ['tune_train_eval','train_eval','predict']:
-            self.log.error("Mode value is not in ['tune_train_eval','train_eval','predict']")
+        if self.mode not in ['tune_train_eval','train_eval','predict','backtest']:
+            self.log.error("Mode value is not in ['tune_train_eval','train_eval','predict','backtest']")
             raise ValueError
 
         self.result_dir_path = self.output_dir_path / 'result'
@@ -92,10 +93,5 @@ class Params(object):
         self.model_dir_path.mkdir(parents=True, exist_ok=True)
 
         self.end_train_x_list = [str(fold_id) for fold_id in setting['fold_id_list_csv'].split(',')]
-
-        for end_train_x in self.end_train_x_list:
-            (self.result_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
-            (self.work_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
-            (self.model_dir_path / str(end_train_x)).mkdir(parents=True, exist_ok=True)
 
         return

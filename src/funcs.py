@@ -7,6 +7,7 @@ from slugify import slugify
 
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import TimeSeriesSplit
 
 def get_moon_phase(d):  # 0=new, 4=full; 4 days/phase
     dec = decimal.Decimal
@@ -118,3 +119,16 @@ def compute_metric(res, test, params):
     res = res.merge(test[[params.id_col, params.time_col, params.dependent_var]], on=[params.id_col,params.time_col], how="left")
     error = mean_squared_error(res["prediction"], res[params.dependent_var])
     return error
+
+def get_splitter(df, params):
+    time_frame = pd.DataFrame({params.time_col: pd.Series(df[params.time_col].unique())})
+    time_frame[params.time_col] = pd.to_datetime(time_frame[params.time_col])
+    time_frame = time_frame.sort_values(by=params.time_col).reset_index()
+    tscv = TimeSeriesSplit(n_splits=params.n_folds, test_size=params.number_predictions)
+    splitter = []
+    for train_index, test_index in tscv.split(time_frame):
+        X_train, X_test = time_frame.iloc[train_index], time_frame.iloc[test_index]
+        train_indexes = df.index[df[params.time_col].isin(X_train[params.time_col])]
+        test_indexes = df.index[df[params.time_col].isin(X_test[params.time_col])]
+        splitter.append((train_indexes, test_indexes))
+    return splitter
