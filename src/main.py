@@ -19,84 +19,206 @@ class myProgram(object):
         return
 
     def main(self):
-        custom = __import__("functions."+self.params.project_key, fromlist=['generate_abt', 'generate_features', 'get_offset'])
+        custom = __import__("functions."+self.params.project_key, fromlist=['generate_base'])
 
         self.log.info('main')
-        result_dir_org_path = self.params.result_dir_path
-        work_dir_org_path = self.params.work_dir_path
-        model_dir_org_path = self.params.model_dir_path
-        self.log.info('generate abt')
-        df = custom.generate_abt(self.params.raw_dir_path, work_dir_org_path)
-        self.log.info('feature engineering')
-        df = custom.generate_features(df, self.params, self.log)
-
+        
+        self.log.info('generate base table')
+        base = custom.generate_base(self.params.raw_dir_path, self.params.work_dir_path, self.params, self.log)
+        
+        # get segments_list
         if self.params.segment_groupby_column:
-            segments_list = df[self.params.segment_groupby_column].unique()
+            self.params.segments_list = base[self.params.segment_groupby_column].unique()
         else:
-            segments_list = ["all"]
+            self.params.segments_list = ["all"]
 
-        scores = []
+        models = {
+            "ph_models": [
+                RandomForest(self.params.id_col, self.params.time_col, self.params.dependent_var, self.log),
+                Last(self.params.id_col, self.params.time_col, self.params.dependent_var, self.log)
+                ]
+        }
+
+        model = RandomForest(self.params.id_col, self.params.time_col, self.params.dependent_var, self.log)
+
+        if self.params.mode == "train_eval":
+            self.train_eval(base, model)
+        if self.params.mode == "tune_train_eval":
+            self.tune_train_eval(base, models)
+
+    def tune_train_eval(self, base, models):
+        custom = __import__("functions."+self.params.project_key, fromlist=['generate_grid', 'get_offset'])
+
+        fold_scores_train, fold_scores_test = [], []
+
         # iterate over folds
         for end_train_x in self.params.end_train_x_list:
-            self.params.end_train_x = end_train_x
+            self.log.info('------------------------', 'fold_id', end_train_x)
+
+            # update folder log, result paths
+            result_dir_org_path = self.params.result_dir_path
+            work_dir_org_path = self.params.work_dir_path
+            model_dir_org_path = self.params.model_dir_path
+
             self.params.result_dir_path = result_dir_org_path / str(end_train_x)
             self.params.work_dir_path = work_dir_org_path / str(end_train_x)
             self.params.model_dir_path = model_dir_org_path / str(end_train_x)
-            # self.params.update_file_path()
+
+            # get time boundaries
+            self.params.end_train_x = end_train_x
             end_train_time = pd.to_datetime(end_train_x)
             offset = custom.get_offset(self.params.number_predictions)
             end_test_time = end_train_time + offset
             self.log.info('train end date {} / test date end {}'.format(str(end_train_time), str(end_test_time)))
-            train_fold, test_fold = funcs.split(df, self.params.time_col, end_train_time, end_test_time)
+            # get test set for later evaluation
+            train_fold, test_fold = funcs.split(base, self.params.time_col, end_train_time, end_test_time)
         
-            res_tgroups = pd.DataFrame()
+            
+            res_tgroups_test, res_tgroups_train = pd.DataFrame(), pd.DataFrame()
+
             # iterate time groups ,each time group has a different prediction horizon
             for predict_horizon in self.params.prediction_horizon_list:
-                self.log.info('-----------------', 'fold_id', end_train_x, 'predict_horizon', predict_horizon)
+                self.log.info('----------------', 'predict_horizon', predict_horizon)
+
+                # get time boundaries
                 begin_test_time_group = end_train_time + custom.get_offset(predict_horizon - self.params.n_predictions_groupby + 1) 
                 end_test_time_group = end_train_time + custom.get_offset(predict_horizon)
-                self.log.info('test begin', str(begin_test_time_group), 'test end', str(end_test_time_group))
+                self.log.info('valid_ph begin', str(begin_test_time_group), 'valid_ph end', str(end_test_time_group))
 
-                self.log.info('shift data')
-                # shifted = funcs.shift_with_pred_horizon(df, self.params.dependent_var, predict_horizon)
-                shifted = funcs.add_last_value(df, self.params.id_col, self.params.dependent_var, predict_horizon)
+                # generate grid, add temporal features with prediction horizon
+                self.log.info('generate grid table')
+                grid_ph = custom.generate_grid(base, self.params, self.log, predict_horizon)
 
-                res_segments = pd.DataFrame()
+                res_segments_test, res_segments_train = pd.DataFrame(), pd.DataFrame()
+
                 # iterate over segments
-                for segment in segments_list:
-                    # split
-                    # self.log.info('split data')
+                for segment in self.params.segments_list:
                     if segment == "all":
-                        part_df = shifted.copy()
-                        self.log.info('data shape '+ str(part_df.shape))
+                        grid_ph_seg = grid_ph.copy()
+                        self.log.info('grid_ph '+ str(grid_ph_seg.shape))
                     else:
                         self.log.info('--------', 'segment', segment)
-                        segmented = shifted[shifted[self.params.segment_groupby_column] == segment]
-                        part_df = segmented.copy()
-                        self.log.info('segment shape '+ str(part_df.shape))
+                        segmented = grid_ph[grid_ph[self.params.segment_groupby_column] == segment]
+                        grid_ph_seg = segmented.copy()
+                        del segmented
+                        self.log.info('grid_ph_seg '+ str(grid_ph_seg.shape))
 
-                    part_df = funcs.drop_constant_columns(part_df, self.log)
-                    train, test = funcs.split_with_time_grouping(part_df, self.params.time_col, end_train_time, begin_test_time_group, end_test_time_group)
+                    # get train test sets
+                    train, test = funcs.split_with_time_grouping(grid_ph_seg, self.params.time_col, end_train_time, begin_test_time_group, end_test_time_group)
 
-                    estimator = RandomForest(self.params.id_col, self.params.time_col, self.params.dependent_var, self.log)
-                    estimator.fit(train)
-                    res = estimator.predict(test)
+                    # fit predict
+                    model.fit(train)
+
+                    res_test = model.predict(test)
+                    res_train = model.predict(train)
+
                     # collect results of segments
-                    res_segments = pd.concat([res_segments, res])
+                    res_segments_test = pd.concat([res_segments_test, res_test])
+                    res_segments_train = pd.concat([res_segments_train, res_train])
                 
                 # collect results of time groups
-                res_tgroups = pd.concat([res_tgroups, res_segments])
+                res_tgroups_test = pd.concat([res_tgroups_test, res_segments_test])
+                res_tgroups_train = pd.concat([res_tgroups_train, res_segments_train])
 
             # compute fold error
-            self.log.info('test result shape'+ str(res_tgroups.shape))
-            error = funcs.compute_metric(res_tgroups, test_fold, self.params)
-            self.log.info('fold_id', end_train_x, 'error', error)
+            test_error = funcs.compute_metric(res_tgroups_test, test_fold, self.params)
+            train_error = funcs.compute_metric(res_tgroups_train, train_fold, self.params)
             # compute fold results
-            scores.append(error)
+            fold_scores_test.append(test_error)
+            fold_scores_train.append(train_error)
 
-        cross_fold_error = np.mean(scores)
-        self.log.info('=> cross fold mean error', cross_fold_error)
+        self.log.info('=> train fold errors', ["{:.3f}".format(error) for error in fold_scores_train])
+        self.log.info('=> train mean error', "{:.6f}".format(np.mean(fold_scores_train)))
+        self.log.info('=> test fold errors', ["{:.3f}".format(error) for error in fold_scores_test])
+        self.log.info('=> test mean error', "{:.6f}".format(np.mean(fold_scores_test)))
+        
+        return
 
+    def train_eval(self, base, model):
+        custom = __import__("functions."+self.params.project_key, fromlist=['generate_grid', 'get_offset'])
+
+        fold_scores_train, fold_scores_test = [], []
+
+        # iterate over folds
+        for end_train_x in self.params.end_train_x_list:
+            self.log.info('------------------------', 'fold_id', end_train_x)
+
+            # update folder log, result paths
+            result_dir_org_path = self.params.result_dir_path
+            work_dir_org_path = self.params.work_dir_path
+            model_dir_org_path = self.params.model_dir_path
+
+            self.params.result_dir_path = result_dir_org_path / str(end_train_x)
+            self.params.work_dir_path = work_dir_org_path / str(end_train_x)
+            self.params.model_dir_path = model_dir_org_path / str(end_train_x)
+
+            # get time boundaries
+            self.params.end_train_x = end_train_x
+            end_train_time = pd.to_datetime(end_train_x)
+            offset = custom.get_offset(self.params.number_predictions)
+            end_test_time = end_train_time + offset
+            self.log.info('train end date {} / test date end {}'.format(str(end_train_time), str(end_test_time)))
+            # get test set for later evaluation
+            train_fold, test_fold = funcs.split(base, self.params.time_col, end_train_time, end_test_time)
+        
+            
+            res_tgroups_test, res_tgroups_train = pd.DataFrame(), pd.DataFrame()
+
+            # iterate time groups ,each time group has a different prediction horizon
+            for predict_horizon in self.params.prediction_horizon_list:
+                self.log.info('----------------', 'predict_horizon', predict_horizon)
+
+                # get time boundaries
+                begin_test_time_group = end_train_time + custom.get_offset(predict_horizon - self.params.n_predictions_groupby + 1) 
+                end_test_time_group = end_train_time + custom.get_offset(predict_horizon)
+                self.log.info('valid_ph begin', str(begin_test_time_group), 'valid_ph end', str(end_test_time_group))
+
+                # generate grid, add temporal features with prediction horizon
+                self.log.info('generate grid table')
+                grid_ph = custom.generate_grid(base, self.params, self.log, predict_horizon)
+
+                res_segments_test, res_segments_train = pd.DataFrame(), pd.DataFrame()
+
+                # iterate over segments
+                for segment in self.params.segments_list:
+                    if segment == "all":
+                        grid_ph_seg = grid_ph.copy()
+                        self.log.info('grid_ph '+ str(grid_ph_seg.shape))
+                    else:
+                        self.log.info('--------', 'segment', segment)
+                        segmented = grid_ph[grid_ph[self.params.segment_groupby_column] == segment]
+                        grid_ph_seg = segmented.copy()
+                        del segmented
+                        self.log.info('grid_ph_seg '+ str(grid_ph_seg.shape))
+
+                    # get train test sets
+                    train, test = funcs.split_with_time_grouping(grid_ph_seg, self.params.time_col, end_train_time, begin_test_time_group, end_test_time_group)
+
+                    # fit predict
+                    model.fit(train)
+
+                    res_test = model.predict(test)
+                    res_train = model.predict(train)
+
+                    # collect results of segments
+                    res_segments_test = pd.concat([res_segments_test, res_test])
+                    res_segments_train = pd.concat([res_segments_train, res_train])
+                
+                # collect results of time groups
+                res_tgroups_test = pd.concat([res_tgroups_test, res_segments_test])
+                res_tgroups_train = pd.concat([res_tgroups_train, res_segments_train])
+
+            # compute fold error
+            test_error = funcs.compute_metric(res_tgroups_test, test_fold, self.params)
+            train_error = funcs.compute_metric(res_tgroups_train, train_fold, self.params)
+            # compute fold results
+            fold_scores_test.append(test_error)
+            fold_scores_train.append(train_error)
+
+        self.log.info('=> train fold errors', ["{:.3f}".format(error) for error in fold_scores_train])
+        self.log.info('=> train mean error', "{:.6f}".format(np.mean(fold_scores_train)))
+        self.log.info('=> test fold errors', ["{:.3f}".format(error) for error in fold_scores_test])
+        self.log.info('=> test mean error', "{:.6f}".format(np.mean(fold_scores_test)))
 
         return
 
@@ -114,6 +236,7 @@ def main():
     parser.add_argument('-npg', '--n_predictions_groupby', type=str, default="6")
     parser.add_argument('-sva', '--segment_groupby_column', type=str)
     parser.add_argument('-flc', '--fold_id_list_csv', type=str, default='2017-06')
+    parser.add_argument('-mod', '--mode', type=str, default='train_eval')
 
     args = parser.parse_args()
 
@@ -130,6 +253,7 @@ def main():
         'n_predictions_groupby': args.n_predictions_groupby,
         'segment_groupby_column': args.segment_groupby_column,
         'fold_id_list_csv': args.fold_id_list_csv,
+        'mode': args.mode,
     })
 
     m = myProgram(params)

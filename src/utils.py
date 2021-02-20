@@ -49,6 +49,7 @@ class Params(object):
         self.data_dir_path = Path(setting['data_dir_path'])
 
         self.project_key = setting['project_key']
+
         self.raw_dir_path = self.data_dir_path / 'raw' / setting['project_key']
         self.raw_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -61,6 +62,11 @@ class Params(object):
         self.log_dir_path.mkdir(parents=True, exist_ok=True)
         self.log = Log(get_logger(self.log_name, self.log_dir_path))
 
+        self.mode = setting['mode']
+        if self.mode not in ['tune_train_eval','train_eval','predict']:
+            self.log.error("Mode value is not in ['tune_train_eval','train_eval','predict']")
+            raise ValueError
+
         self.result_dir_path = self.output_dir_path / 'result'
         self.result_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -72,6 +78,7 @@ class Params(object):
         self.dependent_var = setting['dependent_var']
         self.number_predictions = int(setting['number_predictions'])
         self.n_predictions_groupby = int(setting['n_predictions_groupby'])
+
         self.segment_groupby_column = setting['segment_groupby_column']
 
         if self.number_predictions % self.n_predictions_groupby != 0:

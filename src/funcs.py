@@ -42,49 +42,39 @@ def infer_frequency(df, time_col, id_col):
     return freq
 
 
-def extract_time_features(df, time_col, id_col, log):
+def extract_time_features(df, time_col, log):
     log.info('generate time features')
 
     df[time_col] = pd.to_datetime(df[time_col])
 
-    freq = infer_frequency(df,time_col, id_col)
-
-    all_freqs = ["nanosecond","microsecond","millisecond","second","minute","hour","day","week","month","quarter","year"]
-    rank_freq = all_freqs.index(freq)
+    # freq = infer_frequency(df,time_col, id_col)
+    # all_freqs = ["nanosecond","microsecond","millisecond","second","minute","hour","day","week","month","quarter","year"]
+    # rank_freq = all_freqs.index(freq)
 
     df["year"] = df[time_col].dt.year
 
-    if rank_freq < all_freqs.index("year"):
-        df["quarter"] = df[time_col].dt.quarter.astype(np.int8)
+    df["quarter"] = df[time_col].dt.quarter.astype(np.int8)
 
-    if rank_freq < all_freqs.index("quarter"):
-        df["month"] = df[time_col].dt.month.astype(np.int8)
+    df["month"] = df[time_col].dt.month.astype(np.int8)
 
-    if rank_freq < all_freqs.index("month"):
-        df["week"] = df[time_col].dt.isocalendar().week
-        days = df[time_col].dt.day
-        df['weekmonth'] = days.apply(lambda x: math.ceil(x / 7)).astype(np.int8)
+    df["week"] = df[time_col].dt.isocalendar().week
+    days = df[time_col].dt.day
+    df['weekmonth'] = days.apply(lambda x: math.ceil(x / 7)).astype(np.int8)
 
-    if rank_freq < all_freqs.index("week"):
-        df["dayofweek"] = df[time_col].dt.dayofweek.astype(np.int8)
-        df["weekend"] = (df["dayofweek"] >= 5).astype(np.int8)
-        df["day"] = days
-        df['moon'] = df.date.apply(get_moon_phase)
+    df["dayofweek"] = df[time_col].dt.dayofweek.astype(np.int8)
+    df["weekend"] = (df["dayofweek"] >= 5).astype(np.int8)
+    df["day"] = days
+    df['moon'] = df.date.apply(get_moon_phase)
 
-    if rank_freq < all_freqs.index("day"):
-        df["hour"] = df[time_col].dt.hour
+    df["hour"] = df[time_col].dt.hour
 
-    if rank_freq < all_freqs.index("hour"):
-        df["minute"] = df[time_col].dt.minute
+    df["minute"] = df[time_col].dt.minute
 
-    if rank_freq < all_freqs.index("minute"):
-        df["second"] = df[time_col].dt.second
+    df["second"] = df[time_col].dt.second
 
-    if rank_freq < all_freqs.index("millisecond"):
-        df["microsecond"] = df[time_col].dt.microsecond
+    df["microsecond"] = df[time_col].dt.microsecond
 
-    if rank_freq < all_freqs.index("microsecond"):
-        df["nanosecond"] = df[time_col].dt.nanosecond
+    df["nanosecond"] = df[time_col].dt.nanosecond
 
     return df
 
