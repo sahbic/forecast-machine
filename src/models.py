@@ -65,9 +65,10 @@ class Last(Model):
     def fit(self, train):
         pass
 
-    def tune_fit(self, train, splitter, n_iter):
+    def fit_with_params(self, df):
         pass
 
+    def tune_fit(self, train, splitter, n_iter):
         cv_results = {}
         i = 0
         scores = []
@@ -91,6 +92,7 @@ class Last(Model):
     def predict(self, test):
         var_name = "last"
         res = test.loc[:, [self.id_col, self.time_col, var_name]]
+        res[var_name] = res[var_name].fillna(0)
         res.rename(columns={var_name:"prediction"}, inplace=True)
         return res
 

@@ -1,0 +1,3 @@
+- CLI:
+
+ensure id is unique or test what happens if not ?

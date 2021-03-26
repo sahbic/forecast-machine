@@ -130,6 +130,7 @@ class myProgram(object):
         test_set,train_set = pd.DataFrame(), pd.DataFrame()
 
         fold_idx = 0
+
         for train_indexes, test_indexes in splitter:
             fold_idx +=1
             self.log.info('------------------------', 'fold_id', fold_idx)
@@ -302,7 +303,7 @@ def main():
     parser.add_argument('-sva', '--segment_groupby_column', type=str)
     parser.add_argument('-flc', '--fold_id_list_csv', type=str, default='2017-06')
     parser.add_argument('-mod', '--mode', type=str, default='train_eval')
-    parser.add_argument('-nfo', '--n_folds', type=str, default='train_eval')
+    parser.add_argument('-nfo', '--n_folds', type=str, default='3')
 
     args = parser.parse_args()
 
