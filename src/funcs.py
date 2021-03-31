@@ -1,21 +1,23 @@
-import pandas as pd
-import numpy as np
-
 import datetime
-import math, decimal
-from slugify import slugify
+import decimal
+import math
 
+import numpy as np
+import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
+from slugify import slugify
+
 
 def get_moon_phase(d):  # 0=new, 4=full; 4 days/phase
     dec = decimal.Decimal
     diff = d - datetime.datetime(2001, 1, 1)
     days = dec(diff.days) + (dec(diff.seconds) / dec(86400))
     lunations = dec("0.20439731") + (days * dec("0.03386319269"))
-    phase_index = math.floor((lunations % dec(1) * dec(8)) + dec('0.5'))
+    phase_index = math.floor((lunations % dec(1) * dec(8)) + dec("0.5"))
     return int(phase_index) & 7
+
 
 def infer_frequency(df, time_col, id_col):
     freq = "nanosecond"
@@ -44,7 +46,7 @@ def infer_frequency(df, time_col, id_col):
 
 
 def extract_time_features(df, time_col, log):
-    log.info('generate time features')
+    log.info("generate time features")
 
     df[time_col] = pd.to_datetime(df[time_col])
 
@@ -60,12 +62,12 @@ def extract_time_features(df, time_col, log):
 
     df["week"] = df[time_col].dt.isocalendar().week
     days = df[time_col].dt.day
-    df['weekmonth'] = days.apply(lambda x: math.ceil(x / 7)).astype(np.int8)
+    df["weekmonth"] = days.apply(lambda x: math.ceil(x / 7)).astype(np.int8)
 
     df["dayofweek"] = df[time_col].dt.dayofweek.astype(np.int8)
     df["weekend"] = (df["dayofweek"] >= 5).astype(np.int8)
     df["day"] = days
-    df['moon'] = df.date.apply(get_moon_phase)
+    df["moon"] = df.date.apply(get_moon_phase)
 
     df["hour"] = df[time_col].dt.hour
 
@@ -79,9 +81,11 @@ def extract_time_features(df, time_col, log):
 
     return df
 
+
 def shift_with_pred_horizon(df, dependent_var, predict_horizon):
     df["target"] = df[dependent_var].shift(-predict_horizon)
     return df
+
 
 def add_last_value(df, id_col, dependent_var, predict_horizon):
     var_name = "last"
@@ -89,24 +93,28 @@ def add_last_value(df, id_col, dependent_var, predict_horizon):
     res[var_name] = df.groupby(id_col)[dependent_var].shift(predict_horizon)
     return res
 
+
 def split(df, time_col, end_train_time, end_test_time):
     train = df[df[time_col] <= end_train_time]
     test = df[(df[time_col] > end_train_time) & (df[time_col] <= end_test_time)]
     return train, test
+
 
 def split_with_time_grouping(df, time_col, end_train_time, begin_test_time, end_test_time):
     train = df[df[time_col] <= end_train_time]
     test = df[(df[time_col] >= begin_test_time) & (df[time_col] <= end_test_time)]
     return train, test
 
+
 def drop_constant_columns(df, log):
     dropped = []
     for col in df.columns:
         if len(df[col].unique()) == 1:
             dropped.append(col)
-            df = df.drop(col,axis=1)
-    log.info("dropped columns: "+str(len(dropped)))
+            df = df.drop(col, axis=1)
+    log.info("dropped columns: " + str(len(dropped)))
     return df
+
 
 def get_num_cat_columns(df, params, log):
     cols = df.drop(columns=[params.id_col, params.time_col, params.dependent_var], axis=1).columns
@@ -115,10 +123,16 @@ def get_num_cat_columns(df, params, log):
     num_cols = list(set(num_cols))
     return num_cols, cat_cols
 
+
 def compute_metric(res, test, params):
-    res = res.merge(test[[params.id_col, params.time_col, params.dependent_var]], on=[params.id_col,params.time_col], how="left")
+    res = res.merge(
+        test[[params.id_col, params.time_col, params.dependent_var]],
+        on=[params.id_col, params.time_col],
+        how="left",
+    )
     error = mean_squared_error(res["prediction"], res[params.dependent_var])
     return error
+
 
 def get_splitter(df, params):
     time_frame = pd.DataFrame({params.time_col: pd.Series(df[params.time_col].unique())})

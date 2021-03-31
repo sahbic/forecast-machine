@@ -28,6 +28,31 @@ pip install kaggle
 pip install pretty-errors
 ```
 
+# venv
+
+venv bas:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+pip install -e .
+```
+
+venv windows powershell:
+
+```bash
+python3 -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+pip install -e .
+```
+
+for development environment:
+```bash
+python -m pip install -e ".[dev]"
+```
+
 ## How to run
 ```bash
 conda activate machine
@@ -47,6 +72,19 @@ python src/main.py -pr "tstest" -dv "indicateur" -sva "canal" -npg "3" -flc "201
 python src/main.py -pr "m5a" -dv "Quantity" -nfo "3" -npr "28" -npg "7" -sva "store_id" -mod "tune_train_eval"
 # backtest previously trained models
 python src/main.py -pr "m5a" -dv "Quantity" -nfo "3" -npr "28" -npg "7" -sva "store_id" -mod "backtest"
+```
+
+### CLI
+
+#### M5 Project: m5a
+
+1. Download data
+```bash
+predops download-data m5a
+```
+2. Generate base file (with sample option)
+```bash
+predops generate-base-file m5a --sample
 ```
 
 ## References

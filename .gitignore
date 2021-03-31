@@ -1,11 +1,14 @@
 .vscode
 
+# data
+data
+raw
+
 # specific
 
 src/main_bis.py
 
 notebooks
-raw
 output
 /src/functions/*
 
