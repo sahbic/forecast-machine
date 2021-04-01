@@ -41,14 +41,14 @@ venv:
 # SHELL ::= /bin/bash
 # app:
 # ifneq (${env}, prod)
-# 	uvicorn app.api:app --host 0.0.0.0 --port 5000 --reload --reload-dir tagifai --reload-dir app
+# 	uvicorn app.api:app --host 0.0.0.0 --port 5000 --reload --reload-dir predops --reload-dir app
 # else
 # 	gunicorn -c config/gunicorn.py -k uvicorn.workers.UvicornWorker app.api:app
 # endif
 
-# .PHONY: mlflow
-# mlflow:
-# 	mlflow server -h 0.0.0.0 -p 5000 --backend-store-uri experiments/
+.PHONY: mlflow
+mlflow:
+	mlflow ui --backend-store-uri "sqlite:///mlflow.db"
 
 # .PHONY: streamlit
 # streamlit:
@@ -59,7 +59,7 @@ venv:
 # dvc:
 # 	dvc add data/tags.json
 # 	dvc add data/projects.json
-# 	tagifai clean-experiments --experiments-to-keep best
+# 	predops clean-experiments --experiments-to-keep best
 # 	dvc add experiments
 # 	dvc push
 
@@ -71,7 +71,7 @@ venv:
 
 # .PHONY: test
 # test: great-expectations
-# 	pytest --cov tagifai --cov app --cov-report html
+# 	pytest --cov predops --cov app --cov-report html
 
 # .PHONY: test-non-training
 # test-non-training: great-expectations
