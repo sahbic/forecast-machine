@@ -1,0 +1,5 @@
+project_key: m5a
+# TODO:
+#   - add model hypoerparameters
+#   - add feature engineering
+#   - add optimization metric

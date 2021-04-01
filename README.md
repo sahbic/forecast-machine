@@ -86,6 +86,13 @@ predops download-data m5a
 ```bash
 predops generate-base-file m5a --sample
 ```
+3. Train models: Search, Train and Evaluate
+```bash
+# default parameters
+predops train m5a --target Quantity
+# advanced parameters
+predops train m5a --target Quantity --number-predictions 28 --column-segment-groupby store_id --n-predictions-groupby 7
+```
 
 ## References
 

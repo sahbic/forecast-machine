@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import pandas as pd
+from pandas.tseries.offsets import DateOffset
 
 import src.funcs as funcs
 
@@ -166,6 +167,7 @@ def generate_base(raw_dir_path, work_dir_path, time_column, logger, sampling):
 
     return df
 
+
 def add_time_related_features(df, time_col, log):
     """add time features
 
@@ -177,7 +179,7 @@ def add_time_related_features(df, time_col, log):
     Returns:
         pandas.DataFrame: Dataframe with time features (for seasonality)
     """
-    log.info("- time features - adding time related data")
+    log.info("- time features: adding time related data")
     # init time features DataFrame
     time_features = pd.DataFrame({time_col: pd.Series(df[time_col].unique())})
     # extract date features
@@ -189,3 +191,21 @@ def add_time_related_features(df, time_col, log):
     # join new features
     df = df.merge(time_features, on=time_col)
     return df
+
+
+def generate_grid(df, id_col, dependent_var, predict_horizon, work_dir_path, log):
+    log.info("- generate grid: shifts and aggergations")
+    # temporal feature engineering (depends on prediction horizon)
+    df = funcs.add_last_value(df, id_col, dependent_var, predict_horizon)
+
+    file_name = "temp_"+ str(predict_horizon) + ".csv"
+    temp_path = str(work_dir_path / file_name)
+    df.to_csv(temp_path, index=False)
+
+    return df
+
+def get_offset(number_predictions):
+    """
+    translate number of prediction into number of time steps in DateOffset format
+    """
+    return DateOffset(days=number_predictions)

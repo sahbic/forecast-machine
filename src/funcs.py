@@ -134,15 +134,15 @@ def compute_metric(res, test, params):
     return error
 
 
-def get_splitter(df, params):
-    time_frame = pd.DataFrame({params.time_col: pd.Series(df[params.time_col].unique())})
-    time_frame[params.time_col] = pd.to_datetime(time_frame[params.time_col])
-    time_frame = time_frame.sort_values(by=params.time_col).reset_index()
-    tscv = TimeSeriesSplit(n_splits=params.n_folds, test_size=params.number_predictions)
+def get_splitter(df, time_col, n_folds, number_predictions):
+    time_frame = pd.DataFrame({time_col: pd.Series(df[time_col].unique())})
+    time_frame[time_col] = pd.to_datetime(time_frame[time_col])
+    time_frame = time_frame.sort_values(by=time_col).reset_index()
+    tscv = TimeSeriesSplit(n_splits=n_folds, test_size=number_predictions)
     splitter = []
     for train_index, test_index in tscv.split(time_frame):
         X_train, X_test = time_frame.iloc[train_index], time_frame.iloc[test_index]
-        train_indexes = df.index[df[params.time_col].isin(X_train[params.time_col])]
-        test_indexes = df.index[df[params.time_col].isin(X_test[params.time_col])]
+        train_indexes = df.index[df[time_col].isin(X_train[time_col])]
+        test_indexes = df.index[df[time_col].isin(X_test[time_col])]
         splitter.append((train_indexes, test_indexes))
     return splitter

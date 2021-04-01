@@ -83,6 +83,7 @@ class Last(Model):
                 on=[self.id_col, self.time_col],
                 how="left",
             )
+
             res = mean_squared_error(preds["prediction"], preds[self.dependent_var])
 
             cv_results["split" + str(i) + "_test_score"] = [res]
