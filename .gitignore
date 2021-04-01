@@ -3,6 +3,11 @@
 # data
 data
 raw
+stores
+
+# mlflow
+mlruns
+mlflow.db
 
 # specific
 src/main_bis.py

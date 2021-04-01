@@ -124,13 +124,13 @@ def get_num_cat_columns(df, params, log):
     return num_cols, cat_cols
 
 
-def compute_metric(res, test, params):
+def compute_metric(res, test, id_col, time_col, dependent_var):
     res = res.merge(
-        test[[params.id_col, params.time_col, params.dependent_var]],
-        on=[params.id_col, params.time_col],
+        test[[id_col, time_col, dependent_var]],
+        on=[id_col, time_col],
         how="left",
     )
-    error = mean_squared_error(res["prediction"], res[params.dependent_var])
+    error = mean_squared_error(res["prediction"], res[dependent_var])
     return error
 
 

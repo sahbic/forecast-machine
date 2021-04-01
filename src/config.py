@@ -14,6 +14,7 @@ def init_config(PROJECT_KEY):
     global LOGS_DIR
     global RAW_DIR
     global DATA_DIR
+    global STORES_DIR
     global logger
 
     # Directories
@@ -28,7 +29,7 @@ def init_config(PROJECT_KEY):
     # # Local stores
     # BLOB_STORE = Path(STORES_DIR, "blob")
     # FEATURE_STORE = Path(STORES_DIR, "feature")
-    MODEL_REGISTRY = Path(STORES_DIR, "model")
+    # MODEL_REGISTRY = Path(STORES_DIR, "model")
 
     # Create dirs
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -38,7 +39,7 @@ def init_config(PROJECT_KEY):
     STORES_DIR.mkdir(parents=True, exist_ok=True)
     # BLOB_STORE.mkdir(parents=True, exist_ok=True)
     # FEATURE_STORE.mkdir(parents=True, exist_ok=True)
-    MODEL_REGISTRY.mkdir(parents=True, exist_ok=True)
+    # MODEL_REGISTRY.mkdir(parents=True, exist_ok=True)
 
     # Logger
     logging_config = {

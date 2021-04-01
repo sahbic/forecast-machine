@@ -1,6 +1,9 @@
 import json
 import pickle
 
+import mlflow
+from mlflow.entities import ViewType
+
 import numpy as np
 import pandas as pd
 
@@ -33,13 +36,22 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
 def get_models(id_col, time_col, dependent_var, log):
     models = {
         "ph_models": [
-            RandomForest(
-                id_col, time_col, dependent_var, log
-            ),
+            # RandomForest(
+            #     id_col, time_col, dependent_var, log
+            # ),
             Last(id_col, time_col, dependent_var, log),
         ]
     }
     return models
+
+def delete_experiment(experiment_name: str):
+    """Delete an experiment with name `experiment_name`.
+    Args:
+        experiment_name (str): Name of the experiment.
+    """
+    mlflow_client = mlflow.tracking.MlflowClient()
+    experiment_id = client.get_experiment_by_name(experiment_name).experiment_id
+    mlflow_client.delete_experiment(experiment_id=experiment_id)
 
 def train(
     project_key,
@@ -52,7 +64,7 @@ def train(
     n_folds,
     work_dir_path,
     input_file_name,
-    output_name,
+    stores_dir,
     log
 ):
     custom = __import__(
@@ -64,6 +76,13 @@ def train(
     prediction_horizon_list = get_prediction_horizon_list(number_predictions, n_predictions_groupby)
     segments_list = get_segments_list(base, segment_groupby_column)
     models = get_models(id_col, time_col, dependent_var, log)
+
+    # mlflow
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    # mlflow.set_tracking_uri(stores_dir)
+    tracking_uri = mlflow.get_tracking_uri()
+    log.info("Current tracking uri: {}".format(tracking_uri))
+    mlflow_client = mlflow.tracking.MlflowClient()
 
     results = []
     scores = []
@@ -94,50 +113,212 @@ def train(
 
             model_scores = []
             model_results = []
+            # MLFlow model registry
+            
+            # Start experiment
+            model_name = project_key + "_" + segment + "_" + str(predict_horizon)
+            experiment_id = mlflow.set_experiment(model_name)
+            log.info("experiment id {}".format(experiment_id))
+
             for model in models["ph_models"]:
                 log.info("training " + model.name)
-                result = {}
-                # fit predict
-                model.tune_fit(grid_ph_seg, tscv, 1)
 
-                model_scores.append(model.cv_results["mean_test_score"][model.best_index])
+                # Start run
+                with mlflow.start_run(run_name=model.name):
+                    # Track input file
+                    mlflow.log_artifact(f"{work_dir_path / input_file_name}")
 
-                # document results
-                result["segment"] = segment
-                result["prediction_horizon"] = predict_horizon
-                result["model_name"] = model.name
-                result["mean_test_score"] = model.cv_results["mean_test_score"][
-                    model.best_index
-                ]
-                scores.append(result["mean_test_score"])
-                for i in range(n_folds):
-                    result["split" + str(i) + "_test_score"] = model.cv_results[
-                        "split" + str(i) + "_test_score"
-                    ][model.best_index]
-                result["params"] = model.best_params
-                model_results.append(result)
+                    result = {}
+                    # fit predict
+                    model.tune_fit(grid_ph_seg, tscv, 1)
 
-            # best model has smallest MSE
-            index_best = np.argmin(model_scores)
-            best_model = models["ph_models"][index_best]
-            results.append(model_results[index_best])
-            # save model
-            pickle_name = "model" + "_" + segment + "_" + str(predict_horizon) + ".pkl"
-            # model_path = self.params.model_dir_path / pickle_name
-            # log.info(
-            #     "Save model for segment {} prediction horizon {}".format(
-            #         segment, str(predict_horizon)
-            #     )
-            # )
-            # pickle.dump(best_model, open(model_path, "wb"))
+                    # Track optimal parameters
+                    params = list(model.best_params.keys())
+                    for param in params:
+                        mlflow.log_param(param, model.best_params[param])
+
+                    # Track metrics
+                    mlflow.log_metric("average_mse", model.cv_results["mean_test_score"][model.best_index])
+                    mlflow.log_metric("std_mse", model.cv_results["std_test_score"][model.best_index])
+                    for i in range(n_folds):
+                        mlflow.log_metric("split" + str(i) + "_test_score", model.cv_results["split" + str(i) + "_test_score"][model.best_index])
+
+                    # Track extra data related to the experiment
+                    tags = {
+                        "segment" : segment,
+                        "prediction_horizon": predict_horizon,
+                        "model_name": model.name
+                    }
+                    mlflow.set_tags(tags) 
+
+                    # Log model
+                    mlflow.pyfunc.log_model(artifact_path="model", python_model=model, conda_env=model.conda_env)
+
+                    # End run
+                    mlflow.end_run()
+
+            # Get best run
+            df = mlflow.search_runs(
+                experiment_ids=experiment_id,
+                order_by=["metric.average_mse"],
+                output_format="pandas",
+            )
+            run_id = df.loc[df['metrics.average_mse'].idxmin()]['run_id']
+
+            try:
+                mlflow_client.delete_registered_model(name=model_name)
+            except mlflow.exceptions.MlflowException:
+                pass
+
+            result = mlflow.register_model(
+                    "runs:/{}/model".format(run_id),
+                    model_name
+                )
+
+            mlflow_client.transition_model_version_stage(
+                name=model_name,
+                version=1,
+                stage="Production"
+            )
 
     # Mean of all test error means
     mean_error_means = np.mean(scores)
     log.info(f"Mean of test error means: {mean_error_means:.2f}")
-    # save results
-    # result_path = self.params.result_dir_path / "final_models.json"
-    # log.info("Save final model details to " + result_path)
-    # with open(result_path, "w") as outfile:
-    #     json.dump(results, outfile)
+
+    return
+
+def backtest(
+    project_key,
+    id_col,
+    time_col,
+    dependent_var,
+    number_predictions,
+    n_predictions_groupby,
+    segment_groupby_column,
+    n_folds,
+    work_dir_path,
+    input_file_name,
+    stores_dir,
+    log
+):
+    custom = __import__(
+        project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
+    )
+
+    base = load_base(work_dir_path, input_file_name, log)
+    base[time_col] = pd.to_datetime(base[time_col])
+    prediction_horizon_list = get_prediction_horizon_list(number_predictions, n_predictions_groupby)
+    segments_list = get_segments_list(base, segment_groupby_column)
+
+    splitter = funcs.get_splitter(base, time_col, n_folds, number_predictions)
+
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow_client = mlflow.tracking.MlflowClient()
+
+    fold_scores_train, fold_scores_test = [], []
+    test_set, train_set = pd.DataFrame(), pd.DataFrame()
+
+    fold_idx = 0
+
+    for train_indexes, test_indexes in splitter:
+        fold_idx += 1
+        log.info("------------------------ " + "fold_id " +  str(fold_idx))
+        end_train_time = base.iloc[train_indexes][time_col].max()
+        end_test_time = base.iloc[test_indexes][time_col].max()
+        log.info(
+            "train end date {} / test date end {}".format(
+                str(end_train_time), str(end_test_time)
+            )
+        )
+
+        # concat test sets for later evaluation
+        test_set = pd.concat([test_set, base.iloc[test_indexes]])
+        train_set = pd.concat([train_set, base.iloc[train_indexes]])
+
+        res_tgroups_test, res_tgroups_train = pd.DataFrame(), pd.DataFrame()
+
+        # iterate time groups ,each time group has a different prediction horizon
+        for predict_horizon in prediction_horizon_list:
+            log.info("---------------- " + "predict_horizon " + str(predict_horizon))
+
+            # get time boundaries
+            begin_test_time_group = end_train_time + custom.get_offset(
+                predict_horizon - n_predictions_groupby + 1
+            )
+            end_test_time_group = end_train_time + custom.get_offset(predict_horizon)
+            log.info(
+                "valid_ph begin " +
+                str(begin_test_time_group) +
+                " valid_ph end " +
+                str(end_test_time_group),
+            )
+
+            # generate grid, add temporal features with prediction horizon
+            log.info("generate grid table")
+            grid_ph = custom.generate_grid(base, id_col, dependent_var, predict_horizon, work_dir_path, log)
+
+            res_segments_test, res_segments_train = pd.DataFrame(), pd.DataFrame()
+
+            # iterate over segments
+            for segment in segments_list:
+                if segment == "all":
+                    grid_ph_seg = grid_ph.copy()
+                    log.info("grid_ph " + str(grid_ph_seg.shape))
+                else:
+                    log.info("-------- " + "segment " + segment)
+                    segmented = grid_ph[grid_ph[segment_groupby_column] == segment]
+                    grid_ph_seg = segmented.copy()
+                    del segmented
+                    log.info("grid_ph_seg " + str(grid_ph_seg.shape))
+
+                # get train test sets
+                train, test = funcs.split_with_time_grouping(
+                    grid_ph_seg,
+                    time_col,
+                    end_train_time,
+                    begin_test_time_group,
+                    end_test_time_group,
+                )
+
+                # get model (the object not the trained model because retrained on all dataset)
+                model_name = project_key + "_" + segment + "_" + str(predict_horizon)
+                stage = 'Production'
+
+                run_id = mlflow_client.get_latest_versions(model_name, stages=[stage])[0].run_id
+
+                model_path = mlflow.get_run(run_id).info.artifact_uri + "/model/python_model.pkl"
+                model = pickle.load(open(model_path, "rb"))
+
+                model.fit_with_params(train)
+
+                log.info("{} {}".format(model.name,model.best_params))
+                # fit predict
+                model.fit_with_params(train)
+
+                res_test = model.predict(test)
+                res_train = model.predict(train)
+
+                # collect results of segments
+
+                res_segments_test = pd.concat([res_segments_test, res_test])
+                res_segments_train = pd.concat([res_segments_train, res_train])
+
+            # collect results of time groups
+            res_tgroups_test = pd.concat([res_tgroups_test, res_segments_test])
+            res_tgroups_train = pd.concat([res_tgroups_train, res_segments_train])
+
+        # compute fold error
+        test_error = funcs.compute_metric(res_tgroups_test, test_set, id_col, time_col, dependent_var)
+        train_error = funcs.compute_metric(res_tgroups_train, train_set, id_col, time_col, dependent_var)
+        # compute fold results
+        fold_scores_test.append(test_error)
+        fold_scores_train.append(train_error)
+
+    log.info(
+        "=> train fold errors " + str(["{:.3f}".format(error) for error in fold_scores_train])
+    )
+    log.info("=> train mean error " + "{:.6f}".format(np.mean(fold_scores_train)))
+    log.info("=> test fold errors " + str(["{:.3f}".format(error) for error in fold_scores_test]))
+    log.info("=> test mean error " + "{:.6f}".format(np.mean(fold_scores_test)))
 
     return

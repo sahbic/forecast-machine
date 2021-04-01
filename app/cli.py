@@ -85,10 +85,48 @@ def train(
         n_folds,
         config.DATA_DIR,
         input_file_name,
-        output_name,
+        config.STORES_DIR,
         config.logger)
     
     config.logger.info("Training completed")
+
+@app.command()
+def backtest(
+    project_key: str,
+    id_column: str = "id",
+    time_column: str = "date",
+    target: str = "value",
+    number_predictions: int = 6,
+    n_predictions_groupby: int = 6,
+    column_segment_groupby: str = None,
+    n_folds: int = 3,
+    input_file_name: str = "abt.csv",
+    output_name: str = "default",
+):
+    config.init_config(project_key)
+    config.logger.info("Start backtesting")
+
+    if number_predictions % n_predictions_groupby != 0:
+        config.logger.warning(
+            "number_predictions must be a multiple of n_predictions_groupby. n_predictions_groupby is set to be equal to number_predictions (no time grouping)"
+        )
+        n_predictions_groupby = number_predictions
+
+    main.backtest(
+        project_key,
+        id_column,
+        time_column,
+        target,
+        number_predictions,
+        n_predictions_groupby,
+        column_segment_groupby,
+        n_folds,
+        config.DATA_DIR,
+        input_file_name,
+        config.STORES_DIR,
+        config.logger)
+    
+    config.logger.info("Backtesting completed")
 
 if __name__ == "__main__":
     app()

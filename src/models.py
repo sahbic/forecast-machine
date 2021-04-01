@@ -7,6 +7,7 @@ from sklearn.metrics import make_scorer, mean_squared_error
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
+import mlflow.pyfunc
 
 
 class Model(object):
@@ -54,14 +55,30 @@ class MeanTS(Model):
         return res
 
 
-class Last(Model):
+class Last(mlflow.pyfunc.PythonModel):
     def __init__(self, id_col, time_col, dependent_var, log):
-        Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.id_col = id_col
+        self.time_col = time_col
+        self.dependent_var = dependent_var
+        self.log = log
         self.name = "Last"
         self.last = None
         self.best_params = None
         self.best_index = None
         self.cv_results = None
+        self.conda_env = {
+            'name': 'pandas-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'numpy==1.20.1'
+            ]
+        }
+
+    def get_name(self):
+        return self.name
 
     def fit(self, train):
         pass
@@ -92,8 +109,10 @@ class Last(Model):
 
         cv_results["split" + str(i) + "_test_score"] = [res]
         cv_results["mean_test_score"] = [np.mean(scores)]
+        cv_results["std_test_score"] = [np.std(scores)]
         self.cv_results = cv_results
         self.best_index = 0
+        self.best_params = {}
 
     def predict(self, test):
         var_name = "last"
@@ -116,6 +135,16 @@ class RandomForest(Model):
             "model__min_samples_split": [2, 5, 10],
             "model__max_depth": [3, 5, 10, None],
             "model__criterion": ["mse", "mae"],
+        }
+        self.conda_env = {
+            'name': 'sklearn-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'scikit-learn==0.24.1'
+            ]
         }
 
     def get_pipeline(self):
