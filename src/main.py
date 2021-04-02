@@ -36,9 +36,9 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
 def get_models(id_col, time_col, dependent_var, log):
     models = {
         "ph_models": [
-            # RandomForest(
-            #     id_col, time_col, dependent_var, log
-            # ),
+            RandomForest(
+                id_col, time_col, dependent_var, log
+            ),
             Last(id_col, time_col, dependent_var, log),
         ]
     }
@@ -50,7 +50,7 @@ def delete_experiment(experiment_name: str):
         experiment_name (str): Name of the experiment.
     """
     mlflow_client = mlflow.tracking.MlflowClient()
-    experiment_id = client.get_experiment_by_name(experiment_name).experiment_id
+    experiment_id = mlflow_client.get_experiment_by_name(experiment_name).experiment_id
     mlflow_client.delete_experiment(experiment_id=experiment_id)
 
 def train(
@@ -110,25 +110,25 @@ def train(
             # get CV indexes
             grid_ph_seg = grid_ph_seg.reset_index()
             tscv = funcs.get_splitter(grid_ph_seg, time_col, n_folds, number_predictions)
-
-            model_scores = []
-            model_results = []
-            # MLFlow model registry
             
             # Start experiment
             model_name = project_key + "_" + segment + "_" + str(predict_horizon)
-            experiment_id = mlflow.set_experiment(model_name)
+            mlflow.set_experiment(model_name)
+
+            experiment_id = mlflow.get_experiment_by_name(model_name).experiment_id
             log.info("experiment id {}".format(experiment_id))
 
             for model in models["ph_models"]:
                 log.info("training " + model.name)
+
+                # TODO:
+                # - fetch and track all models from search (https://gist.github.com/liorshk/9dfcb4a8e744fc15650cbd4c2b0955e5)
 
                 # Start run
                 with mlflow.start_run(run_name=model.name):
                     # Track input file
                     mlflow.log_artifact(f"{work_dir_path / input_file_name}")
 
-                    result = {}
                     # fit predict
                     model.tune_fit(grid_ph_seg, tscv, 1)
 
@@ -147,7 +147,8 @@ def train(
                     tags = {
                         "segment" : segment,
                         "prediction_horizon": predict_horizon,
-                        "model_name": model.name
+                        "model_name": model.name,
+                        "n_grid_features": grid_ph_seg.shape[1]
                     }
                     mlflow.set_tags(tags) 
 
@@ -164,6 +165,8 @@ def train(
                 output_format="pandas",
             )
             run_id = df.loc[df['metrics.average_mse'].idxmin()]['run_id']
+            results.append(mlflow.get_run(run_id).to_dictionary())
+            scores.append(mlflow.get_run(run_id).data.metrics["average_mse"])
 
             try:
                 mlflow_client.delete_registered_model(name=model_name)
@@ -183,27 +186,77 @@ def train(
 
     # Mean of all test error means
     mean_error_means = np.mean(scores)
+    # save results
+    result_path = stores_dir / "final_models.json"
+    log.info("Save final model details to " + str(result_path))
+    with open(result_path, "w") as outfile:
+        json.dump(results, outfile)
+
+    # Start experiment
+    mlflow.set_experiment(project_key)
+    with mlflow.start_run():
+        # Track parameters    
+        parameters = {
+            "number_predictions" : number_predictions,
+            "n_predictions_groupby" : n_predictions_groupby,
+            "column_segment_groupby" : segment_groupby_column,
+            "n_folds" : n_folds
+        }
+        mlflow.log_params(parameters)
+
+        # Track column names
+        tags = {
+            "id_column" : id_col,
+            "time_column" : time_col,
+            "target" : dependent_var
+        }
+        mlflow.set_tags(tags) 
+
+        # Track metrics
+        mlflow.log_metric("average_cv_mse", mean_error_means)
+
+        # Track metrics
+        mlflow.log_artifact(result_path)
+
+    # Mean of all test error means
+    mean_error_means = np.mean(scores)
     log.info(f"Mean of test error means: {mean_error_means:.2f}")
 
     return
 
+# TODO:
+# - s'assurer que les modèles enregistrés correspondent bien au best run du projet ? comment ?
+# - ou bien utiliser le best run du projet pour aller récupérer runs et modèles associés
 def backtest(
     project_key,
-    id_col,
-    time_col,
-    dependent_var,
-    number_predictions,
-    n_predictions_groupby,
-    segment_groupby_column,
+    run_id,
     n_folds,
     work_dir_path,
     input_file_name,
-    stores_dir,
     log
 ):
     custom = __import__(
         project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
     )
+
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow_client = mlflow.tracking.MlflowClient()
+    experiment_id = mlflow_client.get_experiment_by_name(project_key).experiment_id
+    if not run_id:
+    # get best run
+        df = mlflow.search_runs(
+            experiment_ids=experiment_id,
+            order_by=["metric.average_cv_mse"],
+            output_format="pandas",
+        )
+        run_id = df.loc[df['metrics.average_cv_mse'].idxmin()]['run_id']
+
+    id_col = mlflow.get_run(run_id).data.tags["id_column"]
+    time_col = mlflow.get_run(run_id).data.tags["time_column"]
+    dependent_var = mlflow.get_run(run_id).data.tags["target"]
+    number_predictions = int(mlflow.get_run(run_id).data.params["number_predictions"])
+    n_predictions_groupby = int(mlflow.get_run(run_id).data.params["n_predictions_groupby"])
+    segment_groupby_column = mlflow.get_run(run_id).data.params["column_segment_groupby"]
 
     base = load_base(work_dir_path, input_file_name, log)
     base[time_col] = pd.to_datetime(base[time_col])
@@ -212,8 +265,6 @@ def backtest(
 
     splitter = funcs.get_splitter(base, time_col, n_folds, number_predictions)
 
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow_client = mlflow.tracking.MlflowClient()
 
     fold_scores_train, fold_scores_test = [], []
     test_set, train_set = pd.DataFrame(), pd.DataFrame()

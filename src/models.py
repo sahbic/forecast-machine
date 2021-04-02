@@ -122,9 +122,12 @@ class Last(mlflow.pyfunc.PythonModel):
         return res
 
 
-class RandomForest(Model):
+class RandomForest(mlflow.pyfunc.PythonModel):
     def __init__(self, id_col, time_col, dependent_var, log):
-        Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.id_col = id_col
+        self.time_col = time_col
+        self.dependent_var = dependent_var
+        self.log = log
         self.name = "RandomForest"
         self.model = None
         self.best_params = None
