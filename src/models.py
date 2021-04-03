@@ -7,21 +7,52 @@ from sklearn.metrics import make_scorer, mean_squared_error
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-import mlflow.pyfunc
+import mlflow
 
 
-class Model(object):
+class Model(mlflow.pyfunc.PythonModel):
     def __init__(self, id_col, time_col, dependent_var, log):
         self.id_col = id_col
         self.time_col = time_col
         self.dependent_var = dependent_var
         self.log = log
+        self.cv_results = {}
+        self.parameters_space = None
+        self.conda_env = None
+        self.name = ""
 
     def fit(self, train):
         pass
 
     def predict(self, test):
         return np.zeros(len(test))
+
+    def track(self, exp_id, tags, n_folds):
+        for i in range(len(self.cv_results['mean_test_score'])):
+            # Start run
+            with mlflow.start_run(experiment_id=exp_id, run_name=self.name):
+                # Track parameters
+                if self.parameters_space:
+                    params = list(self.parameters_space.keys())
+                    for param in params:
+                        mlflow.log_param(param, self.cv_results["param_%s" % param][i])
+
+                # Track metrics
+                mlflow.log_metric("average_mse", self.cv_results["mean_test_score"][i])
+                mlflow.log_metric("std_mse", self.cv_results["std_test_score"][i])
+                for j in range(n_folds):
+                    mlflow.log_metric("split" + str(j) + "_test_score", self.cv_results["split" + str(j) + "_test_score"][i])
+
+                # Track extra data related to the experiment
+                mlflow.set_tags(tags) 
+
+                # Log model
+                if self.conda_env:
+                    mlflow.pyfunc.log_model(artifact_path="model", python_model=self, conda_env=self.conda_env)
+
+                # End run
+                mlflow.end_run()
+
 
 
 class Mean(Model):
@@ -55,17 +86,13 @@ class MeanTS(Model):
         return res
 
 
-class Last(mlflow.pyfunc.PythonModel):
+class Last(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
-        self.id_col = id_col
-        self.time_col = time_col
-        self.dependent_var = dependent_var
-        self.log = log
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.name = "Last"
         self.last = None
         self.best_params = None
         self.best_index = None
-        self.cv_results = None
         self.conda_env = {
             'name': 'pandas-env',
             'channels': ['defaults'],
@@ -107,7 +134,7 @@ class Last(mlflow.pyfunc.PythonModel):
             scores.append(res)
             i = i + 1
 
-        cv_results["split" + str(i) + "_test_score"] = [res]
+        # cv_results["split" + str(i) + "_test_score"] = [res]
         cv_results["mean_test_score"] = [np.mean(scores)]
         cv_results["std_test_score"] = [np.std(scores)]
         self.cv_results = cv_results
@@ -122,12 +149,9 @@ class Last(mlflow.pyfunc.PythonModel):
         return res
 
 
-class RandomForest(mlflow.pyfunc.PythonModel):
+class RandomForest(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
-        self.id_col = id_col
-        self.time_col = time_col
-        self.dependent_var = dependent_var
-        self.log = log
+        Model.__init__(self, id_col, time_col, dependent_var, log)
         self.name = "RandomForest"
         self.model = None
         self.best_params = None

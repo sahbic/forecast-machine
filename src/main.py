@@ -34,6 +34,7 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
     return prediction_horizon_list
 
 def get_models(id_col, time_col, dependent_var, log):
+    # TODO: use yaml config file for each project
     models = {
         "ph_models": [
             RandomForest(
@@ -53,6 +54,9 @@ def delete_experiment(experiment_name: str):
     experiment_id = mlflow_client.get_experiment_by_name(experiment_name).experiment_id
     mlflow_client.delete_experiment(experiment_id=experiment_id)
 
+# TODO:
+# - s'assurer que les modèles du best ovrall experiment correspondent à des exp lancees avec les memes parametres
+# - what to do if no input ?
 def train(
     project_key,
     id_col,
@@ -121,42 +125,15 @@ def train(
             for model in models["ph_models"]:
                 log.info("training " + model.name)
 
-                # TODO:
-                # - fetch and track all models from search (https://gist.github.com/liorshk/9dfcb4a8e744fc15650cbd4c2b0955e5)
+                tags = {
+                    "segment" : segment,
+                    "prediction_horizon": predict_horizon,
+                    "model_name": model.name,
+                    "n_grid_features": grid_ph_seg.shape[1]
+                }
 
-                # Start run
-                with mlflow.start_run(run_name=model.name):
-                    # Track input file
-                    mlflow.log_artifact(f"{work_dir_path / input_file_name}")
-
-                    # fit predict
-                    model.tune_fit(grid_ph_seg, tscv, 1)
-
-                    # Track optimal parameters
-                    params = list(model.best_params.keys())
-                    for param in params:
-                        mlflow.log_param(param, model.best_params[param])
-
-                    # Track metrics
-                    mlflow.log_metric("average_mse", model.cv_results["mean_test_score"][model.best_index])
-                    mlflow.log_metric("std_mse", model.cv_results["std_test_score"][model.best_index])
-                    for i in range(n_folds):
-                        mlflow.log_metric("split" + str(i) + "_test_score", model.cv_results["split" + str(i) + "_test_score"][model.best_index])
-
-                    # Track extra data related to the experiment
-                    tags = {
-                        "segment" : segment,
-                        "prediction_horizon": predict_horizon,
-                        "model_name": model.name,
-                        "n_grid_features": grid_ph_seg.shape[1]
-                    }
-                    mlflow.set_tags(tags) 
-
-                    # Log model
-                    mlflow.pyfunc.log_model(artifact_path="model", python_model=model, conda_env=model.conda_env)
-
-                    # End run
-                    mlflow.end_run()
+                model.tune_fit(grid_ph_seg, tscv, 5)
+                model.track(experiment_id, tags, n_folds)
 
             # Get best run
             df = mlflow.search_runs(
@@ -195,6 +172,9 @@ def train(
     # Start experiment
     mlflow.set_experiment(project_key)
     with mlflow.start_run():
+        # Track input file
+        mlflow.log_artifact(f"{work_dir_path / input_file_name}")
+
         # Track parameters    
         parameters = {
             "number_predictions" : number_predictions,
@@ -215,7 +195,7 @@ def train(
         # Track metrics
         mlflow.log_metric("average_cv_mse", mean_error_means)
 
-        # Track metrics
+        # Track models selected
         mlflow.log_artifact(result_path)
 
     # Mean of all test error means
@@ -226,7 +206,8 @@ def train(
 
 # TODO:
 # - s'assurer que les modèles enregistrés correspondent bien au best run du projet ? comment ?
-# - ou bien utiliser le best run du projet pour aller récupérer runs et modèles associés
+#       ou bien utiliser le best run du projet pour aller récupérer runs et modèles associés
+# - what to do if no train ?
 def backtest(
     project_key,
     run_id,
