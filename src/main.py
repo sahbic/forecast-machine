@@ -88,7 +88,7 @@ def train(
     log.info("Current tracking uri: {}".format(tracking_uri))
     mlflow_client = mlflow.tracking.MlflowClient()
 
-    results = []
+    results = {}
     scores = []
 
     # iterate over time groups ,each time group has a different prediction horizon
@@ -134,7 +134,7 @@ def train(
                         "n_grid_features": grid_ph_seg.shape[1]
                     }
 
-                    model.tune_fit(grid_ph_seg, tscv, 2)
+                    model.tune_fit(grid_ph_seg, tscv, 3)
                     model.track(experiment_id, tags, n_folds)
 
             # Get best run
@@ -146,7 +146,7 @@ def train(
             )
 
             run_id = df.loc[df['metrics.average_mse'].idxmin()]['run_id']
-            results.append(mlflow.get_run(run_id).to_dictionary())
+            results[model_name] = mlflow.get_run(run_id).to_dictionary()
             scores.append(mlflow.get_run(run_id).data.metrics["average_mse"])
 
             try:
@@ -209,8 +209,7 @@ def train(
     return
 
 # TODO:
-# - s'assurer que les modèles enregistrés correspondent bien au best run du projet ? comment ?
-#       ou bien utiliser le best run du projet pour aller récupérer runs et modèles associés
+# - attention si best run utilise preparation de données différentes de l'implem actuelle ?
 # - what to do if no train ?
 def backtest(
     project_key,
@@ -236,6 +235,10 @@ def backtest(
             output_format="pandas",
         )
         run_id = df.loc[df['metrics.average_cv_mse'].idxmin()]['run_id']
+
+    print(mlflow.get_run(run_id).info.artifact_uri)
+    models_file = mlflow.get_run(run_id).info.artifact_uri + "/final_models.json"
+    models_details = json.load(open(models_file, "rb"))
 
     id_col = mlflow.get_run(run_id).data.tags["id_column"]
     time_col = mlflow.get_run(run_id).data.tags["time_column"]
@@ -319,24 +322,18 @@ def backtest(
 
                 # get model (the object not the trained model because retrained on all dataset)
                 model_name = project_key + "_" + segment + "_" + str(predict_horizon)
-                stage = 'Production'
-
-                run_id = mlflow_client.get_latest_versions(model_name, stages=[stage])[0].run_id
-
-                model_path = mlflow.get_run(run_id).info.artifact_uri + "/model/python_model.pkl"
+                # get child run id from model details file
+                child_run_id = models_details[model_name]["info"]["run_id"]
+                # fetch and open the model pickle
+                model_path = mlflow.get_run(child_run_id).info.artifact_uri + "/model/python_model.pkl"
                 model = pickle.load(open(model_path, "rb"))
-
+                # fit the model on current data using the best paranmeters
                 model.fit_with_params(train)
-
-                log.info("{} {}".format(model.name,model.best_params))
-                # fit predict
-                model.fit_with_params(train)
-
+                # predict values for train and test
                 res_test = model.predict(test)
                 res_train = model.predict(train)
 
                 # collect results of segments
-
                 res_segments_test = pd.concat([res_segments_test, res_test])
                 res_segments_train = pd.concat([res_segments_train, res_train])
 
