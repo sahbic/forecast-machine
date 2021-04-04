@@ -55,8 +55,8 @@ def delete_experiment(experiment_name: str):
     mlflow_client.delete_experiment(experiment_id=experiment_id)
 
 # TODO:
-# - s'assurer que les modèles du best ovrall experiment correspondent à des exp lancees avec les memes parametres
 # - what to do if no input ?
+# - add the number of iterations to yaml config file
 def train(
     project_key,
     id_col,
@@ -122,25 +122,29 @@ def train(
             experiment_id = mlflow.get_experiment_by_name(model_name).experiment_id
             log.info("experiment id {}".format(experiment_id))
 
-            for model in models["ph_models"]:
-                log.info("training " + model.name)
+            with mlflow.start_run() as parent_run:
 
-                tags = {
-                    "segment" : segment,
-                    "prediction_horizon": predict_horizon,
-                    "model_name": model.name,
-                    "n_grid_features": grid_ph_seg.shape[1]
-                }
+                for model in models["ph_models"]:
+                    log.info("training " + model.name)
 
-                model.tune_fit(grid_ph_seg, tscv, 5)
-                model.track(experiment_id, tags, n_folds)
+                    tags = {
+                        "segment" : segment,
+                        "prediction_horizon": predict_horizon,
+                        "model_name": model.name,
+                        "n_grid_features": grid_ph_seg.shape[1]
+                    }
+
+                    model.tune_fit(grid_ph_seg, tscv, 2)
+                    model.track(experiment_id, tags, n_folds)
 
             # Get best run
             df = mlflow.search_runs(
                 experiment_ids=experiment_id,
+                filter_string="tags.mlflow.parentRunId = '{}'".format(parent_run.info.run_id),
                 order_by=["metric.average_mse"],
                 output_format="pandas",
             )
+
             run_id = df.loc[df['metrics.average_mse'].idxmin()]['run_id']
             results.append(mlflow.get_run(run_id).to_dictionary())
             scores.append(mlflow.get_run(run_id).data.metrics["average_mse"])
@@ -223,6 +227,7 @@ def backtest(
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow_client = mlflow.tracking.MlflowClient()
     experiment_id = mlflow_client.get_experiment_by_name(project_key).experiment_id
+
     if not run_id:
     # get best run
         df = mlflow.search_runs(

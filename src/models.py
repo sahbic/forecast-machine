@@ -30,7 +30,7 @@ class Model(mlflow.pyfunc.PythonModel):
     def track(self, exp_id, tags, n_folds):
         for i in range(len(self.cv_results['mean_test_score'])):
             # Start run
-            with mlflow.start_run(experiment_id=exp_id, run_name=self.name):
+            with mlflow.start_run(run_name=self.name, nested=True):
                 # Track parameters
                 if self.parameters_space:
                     params = list(self.parameters_space.keys())
@@ -49,9 +49,6 @@ class Model(mlflow.pyfunc.PythonModel):
                 # Log model
                 if self.conda_env:
                     mlflow.pyfunc.log_model(artifact_path="model", python_model=self, conda_env=self.conda_env)
-
-                # End run
-                mlflow.end_run()
 
 
 
