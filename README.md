@@ -19,21 +19,6 @@ The project will implement the following MLOps practices:
 
 ## Installation
 
-<!-- Install from requirements
-```bash
-pip install -r requirements.txt
-```
-
-or from scratch
-
-```bash
-conda create -n machine python=3.7
-pip install swat python-dotenv scikit-learn python-slugify openpyxl
-pip install typer
-pip install kaggle
-pip install pretty-errors
-``` -->
-
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -49,26 +34,6 @@ python -m pip install -e ".[dev]"
 ```
 
 ## How to run
-
-<!-- ```bash
-conda activate machine
-```
-
-```bash
-python ./src/main.py 
-```
-
-or with parameters:
-```bash
-python src/main.py -pr "tstest" -dv "indicateur" -sva "canal" -npg "3" -flc "2017-06,2017-12"
-```
-
-```bash
-# train models (hypertuning and cross-evaluation)
-python src/main.py -pr "m5a" -dv "Quantity" -nfo "3" -npr "28" -npg "7" -sva "store_id" -mod "tune_train_eval"
-# backtest previously trained models
-python src/main.py -pr "m5a" -dv "Quantity" -nfo "3" -npr "28" -npg "7" -sva "store_id" -mod "backtest"
-``` -->
 
 ### CLI
 
