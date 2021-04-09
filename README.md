@@ -66,4 +66,5 @@ mlflow ui --backend-store-uri "sqlite:///mlflow.db"
 ## References
 
 - [M5 Competition 4th place](https://github.com/monsaraida/kaggle-m5-forecasting-accuracy-4th-place)
-- Best practices of developement fron [madewithml repository](https://github.com/GokuMohandas/applied-ml)
+- [Kaggle discussion](https://www.kaggle.com/c/m5-forecasting-accuracy/discussion/163216)
+- Best practices of developement from [madewithml repository](https://github.com/GokuMohandas/applied-ml)

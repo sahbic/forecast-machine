@@ -97,7 +97,7 @@ def train(
 
         # generate grid, add temporal features with prediction horizon
         log.info("generate grid table")
-        grid_ph = custom.generate_grid(base, id_col, dependent_var, predict_horizon, work_dir_path, log)
+        grid_ph = custom.generate_grid(base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log)
 
         # iterate over segments
         for segment in segments_list:
@@ -295,7 +295,7 @@ def backtest(
 
             # generate grid, add temporal features with prediction horizon
             log.info("generate grid table")
-            grid_ph = custom.generate_grid(base, id_col, dependent_var, predict_horizon, work_dir_path, log)
+            grid_ph = custom.generate_grid(base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log)
 
             res_segments_test, res_segments_train = pd.DataFrame(), pd.DataFrame()
 

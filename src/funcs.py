@@ -45,8 +45,8 @@ def infer_frequency(df, time_col, id_col):
     return freq
 
 
-def extract_time_features(df, time_col, log):
-    log.info("generate time features")
+def extract_calendar_features(df, time_col, log):
+    log.info("generate calendar features")
 
     df[time_col] = pd.to_datetime(df[time_col])
 
@@ -93,6 +93,27 @@ def add_last_value(df, id_col, dependent_var, predict_horizon):
     res[var_name] = df.groupby(id_col)[dependent_var].shift(predict_horizon)
     return res
 
+def add_lag_days(df, id_col, dependent_var, predict_horizon, num_lag_day):
+    # example if num_lag_day = 15
+    # lags: ph, ph + 1, ..., ph + 14
+    res = df.copy()
+    for lag in range(predict_horizon, predict_horizon+num_lag_day):
+        var_name = "{}_lag_{}".format(dependent_var,lag)
+        if lag == predict_horizon:
+            var_name = "last"
+        else:
+            var_name = "{}_lag_{}".format(dependent_var,lag)
+        res[var_name] = df.groupby(id_col)[dependent_var].shift(lag)
+    return res
+
+def add_rolling_aggs(df, id_col, target, prediction_horizon, num_rolling_day_list):
+    res = df.copy()
+    for num_rolling_day in num_rolling_day_list:
+            res['rolling_mean_' + str(num_rolling_day)] = res.groupby([id_col])[target].transform(
+                lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).mean()).astype(np.float16)
+            res['rolling_std_' + str(num_rolling_day)] = res.groupby([id_col])[target].transform(
+                lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).std()).astype(np.float16)
+    return res
 
 def split(df, time_col, end_train_time, end_test_time):
     train = df[df[time_col] <= end_train_time]

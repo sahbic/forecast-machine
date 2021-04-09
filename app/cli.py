@@ -8,7 +8,6 @@ from m5a import download, prepare
 
 app = typer.Typer()
 
-
 @app.command()
 def download_data(project_key: str):
     """Download raw data.
@@ -20,23 +19,19 @@ def download_data(project_key: str):
     download.get_data(config.RAW_DIR)
     config.logger.info("Data downloaded!")
 
-# TODO:
-# - add output file name option
-# - remove save csv inside prepare.generate_base and save it in here
-# - remove time feature engineering from base file
 @app.command()
-def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--sample"), time_column: str = "date"):
+def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--sample"), time_column: str = "date", output_file: str = "abt.csv"):
     """Generate base file from raw data.
 
     Args:
         project_key (str): Project key for the organization of project specific files.
         sample (bool, optional): activate sampling. Defaults to typer.Option(False, "--sample").
         time_column (str, optional): The name of the date/time column of the time series. Defaults to "date".
+        output_file (str, optional): Output file to generate in work directory. Defaults to "abt.csv".
     """
     config.init_config(project_key)
-    prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample)
+    prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file)
     config.logger.info("Data transformed, base file generated!")
-
 
 @app.command()
 def train(
