@@ -56,6 +56,25 @@ class Mean(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
         self.mean_value = None
+        self.name = "Mean"
+        self.best_params = None
+        self.best_index = None
+        self.conda_env = {
+            'name': 'pandas-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'numpy==1.20.1'
+            ]
+        }
+    
+    def get_name(self):
+        return self.name
+
+    def fit_with_params(self, df):
+        self.fit(df)
 
     def fit(self, train):
         self.mean_value = train[self.dependent_var].mean()
@@ -65,11 +84,57 @@ class Mean(Model):
         res["prediction"] = self.mean_value
         return res
 
+    def tune_fit(self, df, splitter, n_iter):
+        cv_results = {}
+        i = 0
+        scores = []
+        for train_idx, test_idx in splitter:
+            train = df.iloc[train_idx]
+            self.fit(train)
+            test = df.iloc[test_idx]
+            preds = self.predict(test)
+            preds = preds.fillna(0)
+
+            preds = preds.merge(
+                test[[self.id_col, self.time_col, self.dependent_var]],
+                on=[self.id_col, self.time_col],
+                how="left",
+            )
+
+            res = mean_squared_error(preds["prediction"], preds[self.dependent_var])
+
+            cv_results["split" + str(i) + "_test_score"] = [res]
+            scores.append(res)
+            i = i + 1
+
+        # cv_results["split" + str(i) + "_test_score"] = [res]
+        cv_results["mean_test_score"] = [np.mean(scores)]
+        cv_results["std_test_score"] = [np.std(scores)]
+        self.cv_results = cv_results
+        self.best_index = 0
+        self.best_params = {}
+
 
 class MeanTS(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
         self.means = None
+        self.name = "MeanTS"
+        self.best_params = None
+        self.best_index = None
+        self.conda_env = {
+            'name': 'pandas-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'numpy==1.20.1'
+            ]
+        }
+
+    def get_name(self):
+        return self.name
 
     def fit(self, train):
         self.means = pd.DataFrame(
@@ -81,6 +146,39 @@ class MeanTS(Model):
         res = test.loc[:, [self.id_col, self.time_col]]
         res = res.merge(self.means, on=self.id_col, how="left")
         return res
+    
+    def fit_with_params(self, df):
+        self.fit(df)
+
+    def tune_fit(self, df, splitter, n_iter):
+        cv_results = {}
+        i = 0
+        scores = []
+        for train_idx, test_idx in splitter:
+            train = df.iloc[train_idx]
+            self.fit(train)
+            test = df.iloc[test_idx]
+            preds = self.predict(test)
+            preds = preds.fillna(0)
+
+            preds = preds.merge(
+                test[[self.id_col, self.time_col, self.dependent_var]],
+                on=[self.id_col, self.time_col],
+                how="left",
+            )
+
+            res = mean_squared_error(preds["prediction"], preds[self.dependent_var])
+
+            cv_results["split" + str(i) + "_test_score"] = [res]
+            scores.append(res)
+            i = i + 1
+
+        # cv_results["split" + str(i) + "_test_score"] = [res]
+        cv_results["mean_test_score"] = [np.mean(scores)]
+        cv_results["std_test_score"] = [np.std(scores)]
+        self.cv_results = cv_results
+        self.best_index = 0
+        self.best_params = {}
 
 
 class Last(Model):

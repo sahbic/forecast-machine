@@ -41,6 +41,8 @@ def get_models(id_col, time_col, dependent_var, log):
                 id_col, time_col, dependent_var, log
             ),
             Last(id_col, time_col, dependent_var, log),
+            Mean(id_col, time_col, dependent_var, log),
+            MeanTS(id_col, time_col, dependent_var, log),
         ]
     }
     return models
@@ -236,7 +238,8 @@ def backtest(
         )
         run_id = df.loc[df['metrics.average_cv_mse'].idxmin()]['run_id']
 
-    print(mlflow.get_run(run_id).info.artifact_uri)
+
+    log.info("Selected run for backtest: {}".format(run_id)
     models_file = mlflow.get_run(run_id).info.artifact_uri + "/final_models.json"
     models_details = json.load(open(models_file, "rb"))
 
