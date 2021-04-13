@@ -2,20 +2,26 @@
 
 PredOps is a forecasting tool with the following features:
 
-- Various forecast methods:
-    - Time series statistical methods
-    - Forest ensemble algorithms
-    - Deep Learning approaches
-- Ability to call multiple remote compute environments
-- Back-testing
-- Segmentation capabilities
-- Time segmentation for a more precise forecast
+- [x] Support for multiple forecast methods:
+    - [x] Baselines
+    - [ ] Time series statistical methods
+    - [x] Forest ensemble algorithms
+    - [ ] Deep Learning approaches
+
+- [x] Support for multiple remote compute environments
+    - [x] local environment
+    - [ ] Azure ML 
+    - [x] SAS Viya server
+
+- [x] Back-testing
+- [x] Segmentation capabilities
+- [x] Time segmentation for a more precise forecast
 
 The project will implement the following MLOps practices:
-- Experiment tracking
-- Performance monitoring
-- Retraining
-- CI/CD/CT
+- [x] Experiment tracking
+- [ ] Performance monitoring
+- [ ] Retraining
+- [ ] CI/CD/CT
 
 ## Installation
 

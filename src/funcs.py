@@ -154,7 +154,7 @@ def compute_metric(res, test, id_col, time_col, dependent_var):
     error = mean_squared_error(res["prediction"], res[dependent_var])
     return error
 
-
+# TODO: fix fail if n_folds == 1
 def get_splitter(df, time_col, n_folds, number_predictions):
     time_frame = pd.DataFrame({time_col: pd.Series(df[time_col].unique())})
     time_frame[time_col] = pd.to_datetime(time_frame[time_col])

@@ -1,5 +1,6 @@
 import json
 import pickle
+import time
 
 import mlflow
 from mlflow.entities import ViewType
@@ -138,9 +139,11 @@ def train(
                         "model_name": model.name,
                         "n_grid_features": grid_ph_seg.shape[1]
                     }
-                    
+                    start_time = time.time()
                     # train model (with cross val search)
                     model.tune_fit(grid_ph_seg, tscv, 3)
+                    # print duration
+                    log.info("--- {0:.4f} seconds ---".format(time.time() - start_time))
                     # get and track cross validation results
                     model.track(experiment_id, tags, n_folds)
 

@@ -360,31 +360,15 @@ class RandomForest(Model):
         res["prediction"] = preds
         return res
 
-
-class ViyaGradientBoosting(Model):
+class ViyaModel(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
-        self.name = "ViyaGradientBoosting"
+        self.name = "ViyaModel"
         self.session = None
         self.model = None
         self.best_params = None
         self.best_index = None
         self.parameters_space = {}
-        self.conda_env = {}
-
-
-class ViyaDecisionTree(Model):
-    def __init__(self, id_col, time_col, dependent_var, log):
-        Model.__init__(self, id_col, time_col, dependent_var, log)
-        self.name = "ViyaDecisionTree"
-        self.session = None
-        self.model = None
-        self.best_params = None
-        self.best_index = None
-        self.parameters_space = dict(
-            max_depth=[2],
-            leaf_size=[3],
-        )
         self.conda_env = {
             'name': 'swat-env',
             'channels': ['defaults'],
@@ -397,16 +381,6 @@ class ViyaDecisionTree(Model):
                 'pipefitter==1.0.0'
             ]
         }
-
-    def get_pipeline(self, df):
-        # Define data pipeline
-        inputs = self.get_inputs(df)
-        params = dict(target=self.dependent_var, inputs=inputs)
-        model = DecisionTree(**params)
-
-        pipe = pipefitter.pipeline.Pipeline([model])
-
-        return pipe
 
     def get_session(self):
         env_path = Path.cwd() / ".env"
@@ -446,21 +420,53 @@ class ViyaDecisionTree(Model):
             res["split" + str(i) + "_test_score"] = [df["FoldScores"][j][i] for j in range(df["FoldScores"].shape[0])]
         return res
 
-    def fit(self, df):
 
-        s = self.get_session()
-        table_name = "PREDOPS-TRAIN"+"-"+ str(uuid.uuid4())
-        s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+class ViyaGradientBoosting(ViyaModel):
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.name = "ViyaGradientBoosting"
+        self.session = None
+        self.model = None
+        self.best_params = None
+        self.best_index = None
+        self.parameters_space = {}
+        self.conda_env = {}
 
-        castbl = s.CASTable(table_name)
 
-        pipe = self.get_pipeline(df)
+class ViyaDecisionTree(ViyaModel):
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.name = "ViyaDecisionTree"
+        self.session = None
+        self.model = None
+        self.best_params = None
+        self.best_index = None
+        self.parameters_space = dict(
+            max_depth=[2,6],
+            leaf_size=[3,5],
+        )
+        self.conda_env = {
+            'name': 'swat-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'numpy==1.20.1',
+                'swat==1.6.1',
+                'pipefitter==1.0.0'
+            ]
+        }
 
-        self.model = pipe.fit(castbl)
+    def get_pipeline(self, df):
+        # Define data pipeline
+        inputs = self.get_inputs(df)
+        params = dict(target=self.dependent_var, inputs=inputs)
+        model = DecisionTree(**params)
 
-        s.table.dropTable(name=table_name, quiet="True")
-        s.terminate()
+        pipe = pipefitter.pipeline.Pipeline([model])
+
+        return pipe
 
     def fit_with_params(self, df):
 
@@ -475,6 +481,8 @@ class ViyaDecisionTree(Model):
         pipe.set_params(**self.best_params)
 
         self.model = pipe.fit(castbl)
+        self.model_table = self.model.stages[0].data
+        s.promote(self.model_table)
 
         s.table.dropTable(name=table_name, quiet="True")
         s.terminate()
@@ -496,8 +504,8 @@ class ViyaDecisionTree(Model):
           estimator=pipe,
           param_grid=self.parameters_space, 
           cv=generator)
-
-        search = hpt.gridsearch(castbl).reset_index()
+        # TODO: Viya n_jobs in config parameters
+        search = hpt.gridsearch(castbl, n_jobs=4).reset_index()
 
         # self.model = hpt
         self.best_index = search['MeanScore'].idxmin()
@@ -520,9 +528,9 @@ class ViyaDecisionTree(Model):
         s.table.dropTable("KSCORE", quiet="True")
         r = castbl.decisiontree.dtreescore(modeltable=model_table, copyvars=[self.id_col, self.time_col, self.dependent_var],casout={"name":"KSCORE","promote":"True"})
 
-        preds = s.CASTable("KSCORE").to_frame()
-        preds.rename(columns={"_DT_PredMean_":"prediction"}, inplace=True)
-        res = preds[[self.id_col, self.time_col,"prediction"]]
+        res = s.CASTable("KSCORE").to_frame()
+        res.rename(columns={"_DT_PredMean_":"prediction"}, inplace=True)
+        res = res[[self.id_col, self.time_col,"prediction"]]
         res[self.time_col] = pd.to_datetime(res[self.time_col])
 
         s.table.dropTable(name=table_name, quiet="True")
