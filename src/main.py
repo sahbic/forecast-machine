@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src import funcs
-from src.models import Last, Mean, MeanTS, RandomForest
+from src.models import Last, Mean, MeanTS, RandomForest, ViyaGradientBoosting, ViyaDecisionTree
 
 
 def load_base(work_dir_path, input_file_name, log):
@@ -33,16 +33,19 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
     )
     return prediction_horizon_list
 
+# TODO: use yaml config file for each project
 def get_models(id_col, time_col, dependent_var, log):
-    # TODO: use yaml config file for each project
+    # models = {
+    #     "ph_models": [
+    #         Last(id_col, time_col, dependent_var, log),
+    #         Mean(id_col, time_col, dependent_var, log),
+    #         MeanTS(id_col, time_col, dependent_var, log),
+    #         ViyaDecisionTree(id_col, time_col, dependent_var, log)
+    #     ]
+    # }
     models = {
         "ph_models": [
-            RandomForest(
-                id_col, time_col, dependent_var, log
-            ),
-            Last(id_col, time_col, dependent_var, log),
-            Mean(id_col, time_col, dependent_var, log),
-            MeanTS(id_col, time_col, dependent_var, log),
+            ViyaDecisionTree(id_col, time_col, dependent_var, log)
         ]
     }
     return models
@@ -135,8 +138,10 @@ def train(
                         "model_name": model.name,
                         "n_grid_features": grid_ph_seg.shape[1]
                     }
-
+                    
+                    # train model (with cross val search)
                     model.tune_fit(grid_ph_seg, tscv, 3)
+                    # get and track cross validation results
                     model.track(experiment_id, tags, n_folds)
 
             # Get best run
@@ -239,7 +244,7 @@ def backtest(
         run_id = df.loc[df['metrics.average_cv_mse'].idxmin()]['run_id']
 
 
-    log.info("Selected run for backtest: {}".format(run_id)
+    log.info("Selected run for backtest: {}".format(run_id))
     models_file = mlflow.get_run(run_id).info.artifact_uri + "/final_models.json"
     models_details = json.load(open(models_file, "rb"))
 
@@ -248,7 +253,7 @@ def backtest(
     dependent_var = mlflow.get_run(run_id).data.tags["target"]
     number_predictions = int(mlflow.get_run(run_id).data.params["number_predictions"])
     n_predictions_groupby = int(mlflow.get_run(run_id).data.params["n_predictions_groupby"])
-    segment_groupby_column = mlflow.get_run(run_id).data.params["column_segment_groupby"]
+    segment_groupby_column = None if mlflow.get_run(run_id).data.params["column_segment_groupby"] == 'None' else mlflow.get_run(run_id).data.params["column_segment_groupby"]
 
     base = load_base(work_dir_path, input_file_name, log)
     base[time_col] = pd.to_datetime(base[time_col])

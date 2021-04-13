@@ -1,6 +1,7 @@
 numpy==1.20.1
 pandas==1.2.2
 swat==1.6.1
+pipefitter==1.0.0
 python-dotenv==0.15.0
 scikit-learn==0.24.1
 python-slugify==4.0.1
