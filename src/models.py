@@ -22,6 +22,9 @@ from dotenv import load_dotenv
 import os
 import uuid
 import json
+import random
+import string
+import requests
 
 import mlflow
 
@@ -43,7 +46,7 @@ class Model(mlflow.pyfunc.PythonModel):
     def predict(self, test):
         return np.zeros(len(test))
 
-    def track(self, exp_id, tags, n_folds):
+    def track(self, exp_id, tags, test_mode, n_periods):
         for i in range(len(self.cv_results['mean_test_score'])):
             # Start run
             with mlflow.start_run(run_name=self.name, nested=True):
@@ -56,8 +59,10 @@ class Model(mlflow.pyfunc.PythonModel):
                 # Track metrics
                 mlflow.log_metric("average_mse", self.cv_results["mean_test_score"][i])
                 mlflow.log_metric("std_mse", self.cv_results["std_test_score"][i])
-                for j in range(n_folds):
-                    mlflow.log_metric("split" + str(j) + "_test_score", self.cv_results["split" + str(j) + "_test_score"][i])
+
+                if test_mode == "cv":
+                    for j in range(n_periods):
+                        mlflow.log_metric("split" + str(j) + "_test_score", self.cv_results["split" + str(j) + "_test_score"][i])
 
                 # Track extra data related to the experiment
                 mlflow.set_tags(tags) 
@@ -392,9 +397,9 @@ class ViyaModel(Model):
         HOST_PORT = os.getenv("HOST_PORT")
 
         if self.session:
-            s = swat.CAS(HOST_IP, int(HOST_PORT), USER_NAME, PASSWORD, caslib="Public", session=self.session)
+            s = swat.CAS(HOST_IP, int(HOST_PORT), USER_NAME, PASSWORD, session=self.session)
         else:
-            s = swat.CAS(HOST_IP, int(HOST_PORT), USER_NAME, PASSWORD, caslib="Public")
+            s = swat.CAS(HOST_IP, int(HOST_PORT), USER_NAME, PASSWORD)
             # self.session = s.session.sessionId()
 
         return s
@@ -419,6 +424,62 @@ class ViyaModel(Model):
         for i in range(len(list(df["FoldScores"][0]))):
             res["split" + str(i) + "_test_score"] = [df["FoldScores"][j][i] for j in range(df["FoldScores"].shape[0])]
         return res
+
+    def getToken(self):
+        env_path = Path.cwd() / ".env"
+        load_dotenv(dotenv_path=env_path)
+
+        HOST_IP = os.getenv("HOST_IP")
+        USER_NAME = os.getenv("USER_NAME")
+        PASSWORD = os.getenv("PASSWORD")
+
+        url = "http://{}/SASLogon/oauth/token?grant_type=password&username={}&password={}".format(HOST_IP, USER_NAME, PASSWORD)
+
+        payload={}
+        headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic c2FzLmVjOg=='
+        }
+
+        response = requests.request("GET", url, headers=headers, data=payload)
+        dict_res = json.loads(response.text)
+
+        return("Bearer " + dict_res["access_token"])
+
+    def createMLPAProject(self, oauthToken, project_name, target):
+
+        HOST_IP = os.getenv("HOST_IP")
+        USER_NAME = os.getenv("USER_NAME")
+
+        url = "http://{}/mlPipelineAutomation/projects".format(HOST_IP)
+
+        headers = {
+            'Authorization': oauthToken,
+            'Accept': "application/vnd.sas.analytics.ml.pipeline.automation.project+json",
+            'Content-Type': "application/json"
+        }
+        payload = {
+            'dataTableUri': '/dataTables/dataSources/cas~fs~cas-shared-default~fs~CASUSER({})/tables/'.format(USER_NAME) + project_name + "_TRAIN",
+            'type': 'predictive',
+            'name': project_name,
+            'description': 'Project generated for test',
+            'settings': {
+                'autoRun': True,
+                'modelingMode': 'Standard',
+                'maxModelingTime': 0,
+                "numberOfModels": 5
+            },
+            'analyticsProjectAttributes': {
+                'targetVariable': target
+            }
+        }
+
+        payload_data = json.dumps(payload, indent=4)
+
+        response = requests.request("POST", url, headers=headers, data=payload_data)
+        dict_res = json.loads(response.text)
+
+        return dict_res
 
 
 class ViyaGradientBoosting(ViyaModel):
@@ -505,9 +566,11 @@ class ViyaDecisionTree(ViyaModel):
           param_grid=self.parameters_space, 
           cv=generator)
         # TODO: Viya n_jobs in config parameters
-        search = hpt.gridsearch(castbl, n_jobs=4).reset_index()
+        search = hpt.gridsearch(castbl).reset_index()
 
         # self.model = hpt
+        # TODO: save table name in order to be able to score
+        # Does the hpt retrain the model on all folds ?
         self.best_index = search['MeanScore'].idxmin()
         self.best_params = search.loc[self.best_index,"Parameters"]
         self.cv_results = self.to_cv_results(search) 
@@ -538,3 +601,133 @@ class ViyaDecisionTree(ViyaModel):
 
         return res
 
+class ViyaMLPA(ViyaModel):
+    def __init__(self, id_col, time_col, dependent_var, log):
+        Model.__init__(self, id_col, time_col, dependent_var, log)
+        self.name = "ViyaMLPA"
+        self.session = None
+        self.model = None
+        self.best_params = None
+        self.best_index = None
+        self.conda_env = {
+            'name': 'swat-env',
+            'channels': ['defaults'],
+            'dependencies': [
+                'python=3.9.2',
+                'cloudpickle==1.6.0',
+                'pandas==1.2.2',
+                'numpy==1.20.1',
+                'swat==1.6.1',
+                'pipefitter==1.0.0'
+            ]
+        }
+
+    def fit_with_params(self, df):
+
+        s = self.get_session()
+        table_name = "PREDOPS-TRAIN"+"-"+ str(uuid.uuid4())
+        s.table.dropTable(name=table_name, quiet="True")
+        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+
+        castbl = s.CASTable(table_name)
+
+        pipe = self.get_pipeline(df)
+        pipe.set_params(**self.best_params)
+
+        self.model = pipe.fit(castbl)
+        self.model_table = self.model.stages[0].data
+        s.promote(self.model_table)
+
+        s.table.dropTable(name=table_name, quiet="True")
+        s.terminate()
+
+    def tune_fit(self, df, splitter, n_iter):
+
+        s = self.get_session()
+        table_name = "PREDOPS-SEARCH"+"-"+ str(uuid.uuid4())
+        project_name = "PREDOPS_MLPA" + str(random.randint(1,100)) + random.choice(string.ascii_letters)
+
+        train_idx = list(splitter[0][0])
+        test_idx = list(splitter[0][1])
+
+        df["_PARTIND_"] = None
+        df.loc[train_idx, "_PARTIND_"] = 1
+        df.loc[test_idx, "_PARTIND_"] = 0
+
+        s.table.dropTable(name=table_name, quiet="True")
+        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+
+        var_list = list()
+        for col in self.get_inputs(df):
+            var_list.append({"name" : col})
+        var_list.append({"name" : self.dependent_var})
+
+        print(var_list)
+
+        s.table.dropTable(name=project_name + "_TRAIN", quiet="True")
+        s.table.partition(table={'name' : table_name, "vars" : var_list}, 
+                                 casout={'name' : project_name + "_TRAIN", 'promote' : True})
+
+        # -----------------------------------------------
+        # Get authentication token
+        # -----------------------------------------------
+
+        oauthToken = self.getToken()
+
+        self.log.info(oauthToken)
+
+        # -----------------------------------------------
+        # REST request for creating MLPA project
+        # -----------------------------------------------
+
+        mlpaProject = self.createMLPAProject(oauthToken, project_name, self.dependent_var)
+
+        self.log.info(mlpaProject)
+
+        # -----------------------------------------------
+        # Poll every 5 seconds until MLPA project state is completed
+        # -----------------------------------------------
+
+        # projectStateLink = list(filter(lambda x: x["rel"] == "state", mlpaProject["links"]))[0]
+
+        # generator = ((castbl.query('index in ({})'.format(str(list(splitter[i][0]))[1:-1])) ,castbl.query('index in ({})'.format(str(list(splitter[i][1]))[1:-1]))) for i in range(len(splitter)))
+
+        # hpt = HyperParameterTuning(
+        #   estimator=pipe,
+        #   param_grid=self.parameters_space, 
+        #   cv=generator)
+        # # TODO: Viya n_jobs in config parameters
+        # search = hpt.gridsearch(castbl).reset_index()
+
+        # # self.model = hpt
+        # # TODO: save table name in order to be able to score
+        # # Does the hpt retrain the model on all folds ?
+        # self.best_index = search['MeanScore'].idxmin()
+        # self.best_params = search.loc[self.best_index,"Parameters"]
+        # self.cv_results = self.to_cv_results(search) 
+
+        s.table.dropTable(name=table_name, quiet="True")
+        s.terminate()
+
+    def predict(self, test):
+        s = self.get_session()
+        table_name = "PREDOPS-TEST"+"-"+ str(uuid.uuid4())
+        s.table.dropTable(name=table_name, quiet="True")
+        s.upload_frame(test, casout=dict(name=table_name,promote=True))
+
+        castbl = s.CASTable(table_name)
+        model_table = self.model.stages[0].data
+
+        s.loadactionset('decisiontree')
+        s.table.dropTable("KSCORE", quiet="True")
+        r = castbl.decisiontree.dtreescore(modeltable=model_table, copyvars=[self.id_col, self.time_col, self.dependent_var],casout={"name":"KSCORE","promote":"True"})
+
+        res = s.CASTable("KSCORE").to_frame()
+        res.rename(columns={"_DT_PredMean_":"prediction"}, inplace=True)
+        res = res[[self.id_col, self.time_col,"prediction"]]
+        res[self.time_col] = pd.to_datetime(res[self.time_col])
+
+        s.table.dropTable(name=table_name, quiet="True")
+        s.terminate()
+
+        return res

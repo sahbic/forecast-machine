@@ -155,15 +155,35 @@ def compute_metric(res, test, id_col, time_col, dependent_var):
     return error
 
 # TODO: fix fail if n_folds == 1
-def get_splitter(df, time_col, n_folds, number_predictions):
+def get_splitter(df, time_col, test_mode, n_periods, number_predictions, log):
     time_frame = pd.DataFrame({time_col: pd.Series(df[time_col].unique())})
     time_frame[time_col] = pd.to_datetime(time_frame[time_col])
     time_frame = time_frame.sort_values(by=time_col).reset_index()
-    tscv = TimeSeriesSplit(n_splits=n_folds, test_size=number_predictions)
-    splitter = []
-    for train_index, test_index in tscv.split(time_frame):
-        X_train, X_test = time_frame.iloc[train_index], time_frame.iloc[test_index]
-        train_indexes = df.index[df[time_col].isin(X_train[time_col])]
-        test_indexes = df.index[df[time_col].isin(X_test[time_col])]
+
+    if test_mode == "cv":
+        n_folds = n_periods
+        if n_folds < 2:
+            n_folds = 2
+            log.warn("number of cross validation folds set to {}".format(n_folds))
+
+        tscv = TimeSeriesSplit(n_splits=n_folds, test_size=number_predictions)
+
+        splitter = []
+        for train_index, test_index in tscv.split(time_frame):
+            X_train, X_test = time_frame.iloc[train_index], time_frame.iloc[test_index]
+            train_indexes = df.index[df[time_col].isin(X_train[time_col])]
+            test_indexes = df.index[df[time_col].isin(X_test[time_col])]
+            splitter.append((train_indexes, test_indexes))
+
+    elif test_mode == "split":
+        splitter = []
+        number_test_records = number_predictions*n_periods
+        train_indexes = df.index[:-number_test_records]
+        test_indexes = df.index[-number_test_records:]
         splitter.append((train_indexes, test_indexes))
+
+    else:
+        splitter = []
+
+    
     return splitter

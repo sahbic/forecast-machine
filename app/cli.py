@@ -1,7 +1,10 @@
 # app/cli.py
 # Command line interface (CLI) application.
 
+from swat.utils.config import option_context
 import typer
+
+from enum import Enum
 
 from src import config, main
 from m5a import download, prepare
@@ -33,6 +36,10 @@ def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--s
     prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file)
     config.logger.info("Data transformed, base file generated!")
 
+class TestMode(str, Enum):
+    split = "split"
+    cv = "cv"
+
 @app.command()
 def train(
     project_key: str,
@@ -42,7 +49,8 @@ def train(
     number_predictions: int = 6,
     n_predictions_groupby: int = 6,
     column_segment_groupby: str = None,
-    n_folds: int = 3,
+    test_mode: TestMode = TestMode.split,
+    n_periods: int = 3,
     input_file_name: str = "abt.csv",
 ):
     """Train models with hyperparameters tuning, and evaluate the results.
@@ -75,7 +83,8 @@ def train(
         number_predictions,
         n_predictions_groupby,
         column_segment_groupby,
-        n_folds,
+        test_mode,
+        n_periods,
         config.DATA_DIR,
         input_file_name,
         config.STORES_DIR,
@@ -83,6 +92,8 @@ def train(
     
     config.logger.info("Training completed")
 
+# TODO: add a retrain option
+# if not retrain train on first period and predict on all others
 @app.command()
 def backtest(
     project_key: str,

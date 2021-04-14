@@ -8,20 +8,19 @@ PredOps is a forecasting tool with the following features:
     - [x] Forest ensemble algorithms
     - [ ] Deep Learning approaches
 
-- [x] Support for multiple remote compute environments
+- [x] Support for multiple compute environments
     - [x] local environment
     - [ ] Azure ML 
     - [x] SAS Viya server
 
 - [x] Back-testing
 - [x] Segmentation capabilities
-- [x] Time segmentation for a more precise forecast
+- [x] Time segmentation (prediction horizon grouping)
 
-The project will implement the following MLOps practices:
+The project will implement the following MLOps practices (CI/CD/CT) :
 - [x] Experiment tracking
 - [ ] Performance monitoring
 - [ ] Retraining
-- [ ] CI/CD/CT
 
 ## Installation
 
@@ -63,7 +62,7 @@ predops train m5a --target Quantity --number-predictions 28 --column-segment-gro
 
 ### MLFlow
 
-MLFlow allows to track the experiments
+MLFlow allows to track the experiments and compare runs
 
 ```bash
 mlflow ui --backend-store-uri "sqlite:///mlflow.db"

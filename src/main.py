@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 
 from src import funcs
-from src.models import Last, Mean, MeanTS, RandomForest, ViyaGradientBoosting, ViyaDecisionTree
+from src.models import Last, Mean, MeanTS, RandomForest
+from src.models import ViyaGradientBoosting, ViyaDecisionTree, ViyaMLPA
 
 
 def load_base(work_dir_path, input_file_name, log):
@@ -46,7 +47,7 @@ def get_models(id_col, time_col, dependent_var, log):
     # }
     models = {
         "ph_models": [
-            ViyaDecisionTree(id_col, time_col, dependent_var, log)
+            RandomForest(id_col, time_col, dependent_var, log)
         ]
     }
     return models
@@ -71,7 +72,8 @@ def train(
     number_predictions,
     n_predictions_groupby,
     segment_groupby_column,
-    n_folds,
+    test_mode,
+    n_periods,
     work_dir_path,
     input_file_name,
     stores_dir,
@@ -119,7 +121,7 @@ def train(
 
             # get CV indexes
             grid_ph_seg = grid_ph_seg.reset_index()
-            tscv = funcs.get_splitter(grid_ph_seg, time_col, n_folds, number_predictions)
+            tscv = funcs.get_splitter(grid_ph_seg, time_col, test_mode, n_periods, number_predictions, log)
             
             # Start experiment
             model_name = project_key + "_" + segment + "_" + str(predict_horizon)
@@ -131,21 +133,26 @@ def train(
             with mlflow.start_run() as parent_run:
 
                 for model in models["ph_models"]:
-                    log.info("training " + model.name)
 
-                    tags = {
-                        "segment" : segment,
-                        "prediction_horizon": predict_horizon,
-                        "model_name": model.name,
-                        "n_grid_features": grid_ph_seg.shape[1]
-                    }
-                    start_time = time.time()
-                    # train model (with cross val search)
-                    model.tune_fit(grid_ph_seg, tscv, 3)
-                    # print duration
-                    log.info("--- {0:.4f} seconds ---".format(time.time() - start_time))
-                    # get and track cross validation results
-                    model.track(experiment_id, tags, n_folds)
+                    # do not train ViyaMLPA if doing cross validation
+                    if not ((model.name == "ViyaMLPA") and (test_mode == "cv")):
+
+                        log.info("training " + model.name)
+
+                        tags = {
+                            "segment" : segment,
+                            "prediction_horizon": predict_horizon,
+                            "model_name": model.name,
+                            "n_grid_features": grid_ph_seg.shape[1]
+                        }
+                        
+                        start_time = time.time()
+                        # train model (with cross val search)
+                        model.tune_fit(grid_ph_seg, tscv, 3)
+                        # print duration
+                        log.info("--- {0:.4f} seconds ---".format(time.time() - start_time))
+                        # get and track cross validation results
+                        model.track(experiment_id, tags, test_mode, n_periods)
 
             # Get best run
             df = mlflow.search_runs(
@@ -194,7 +201,8 @@ def train(
             "number_predictions" : number_predictions,
             "n_predictions_groupby" : n_predictions_groupby,
             "column_segment_groupby" : segment_groupby_column,
-            "n_folds" : n_folds
+            "test_mode": test_mode,
+            "n_periods" : n_periods
         }
         mlflow.log_params(parameters)
 
@@ -263,7 +271,7 @@ def backtest(
     prediction_horizon_list = get_prediction_horizon_list(number_predictions, n_predictions_groupby)
     segments_list = get_segments_list(base, segment_groupby_column)
 
-    splitter = funcs.get_splitter(base, time_col, n_folds, number_predictions)
+    splitter = funcs.get_splitter(base, time_col, "cv", n_folds, number_predictions, log)
 
 
     fold_scores_train, fold_scores_test = [], []
