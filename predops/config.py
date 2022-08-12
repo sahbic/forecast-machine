@@ -1,4 +1,4 @@
-# m5a/config.py
+# predops/config.py
 # Configurations.
 
 import logging

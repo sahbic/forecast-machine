@@ -27,5 +27,5 @@ skip_gitignore = true
 virtual_env = "venv"
 
 # Pytest coverage
-[tool.coverage.run]
-omit = ["app/main.py"]
+# [tool.coverage.run]
+# omit = ["app/main.py"]

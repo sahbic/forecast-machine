@@ -1,13 +1,12 @@
-# app/cli.py
+# predops/cli.py
 # Command line interface (CLI) application.
 
 import typer
 
-from src import config, main
-from m5a import download, prepare
+from predops import config, main, download
+from predops.datasets.m5a import prepare
 
 app = typer.Typer()
-
 
 @app.command()
 def download_data(project_key: str):
@@ -17,8 +16,7 @@ def download_data(project_key: str):
         project_key (str): Project key for the organization of project specific files.
     """
     config.init_config(project_key)
-    download.get_data(config.RAW_DIR)
-    config.logger.info("Data downloaded!")
+    download.get_data(project_key, config.RAW_DIR)
 
 # TODO:
 # - add output file name option
@@ -108,5 +106,5 @@ def backtest(
     
     config.logger.info("Backtesting completed")
 
-if __name__ == "__main__":
-    app()
+# if __name__ == "__main__":
+#     app()

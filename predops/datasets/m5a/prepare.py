@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
 
-import src.funcs as funcs
+import predops.funcs as funcs
 
 def generate_base(raw_dir_path, work_dir_path, time_column, logger, sampling):
     """Generate base file (on SAS Viya)

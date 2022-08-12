@@ -7,8 +7,8 @@ from mlflow.entities import ViewType
 import numpy as np
 import pandas as pd
 
-from src import funcs
-from src.models import Last, Mean, MeanTS, RandomForest
+from predops import funcs
+from predops.models import Last, Mean, MeanTS, RandomForest
 
 
 def load_base(work_dir_path, input_file_name, log):
@@ -72,7 +72,7 @@ def train(
     log
 ):
     custom = __import__(
-        project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
+        "predops.datasets." + project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
     )
 
     base = load_base(work_dir_path, input_file_name, log)
