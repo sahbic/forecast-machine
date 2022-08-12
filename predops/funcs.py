@@ -93,27 +93,36 @@ def add_last_value(df, id_col, dependent_var, predict_horizon):
     res[var_name] = df.groupby(id_col)[dependent_var].shift(predict_horizon)
     return res
 
+
 def add_lag_days(df, id_col, dependent_var, predict_horizon, num_lag_day):
     # example if num_lag_day = 15
     # lags: ph, ph + 1, ..., ph + 14
     res = df.copy()
-    for lag in range(predict_horizon, predict_horizon+num_lag_day):
-        var_name = "{}_lag_{}".format(dependent_var,lag)
+    for lag in range(predict_horizon, predict_horizon + num_lag_day):
+        var_name = "{}_lag_{}".format(dependent_var, lag)
         if lag == predict_horizon:
             var_name = "last"
         else:
-            var_name = "{}_lag_{}".format(dependent_var,lag)
+            var_name = "{}_lag_{}".format(dependent_var, lag)
         res[var_name] = df.groupby(id_col)[dependent_var].shift(lag)
     return res
+
 
 def add_rolling_aggs(df, id_col, target, prediction_horizon, num_rolling_day_list):
     res = df.copy()
     for num_rolling_day in num_rolling_day_list:
-            res['rolling_mean_' + str(num_rolling_day)] = res.groupby([id_col])[target].transform(
-                lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).mean()).astype(np.float16)
-            res['rolling_std_' + str(num_rolling_day)] = res.groupby([id_col])[target].transform(
-                lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).std()).astype(np.float16)
+        res["rolling_mean_" + str(num_rolling_day)] = (
+            res.groupby([id_col])[target]
+            .transform(lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).mean())
+            .astype(np.float16)
+        )
+        res["rolling_std_" + str(num_rolling_day)] = (
+            res.groupby([id_col])[target]
+            .transform(lambda x: x.shift(prediction_horizon).rolling(num_rolling_day).std())
+            .astype(np.float16)
+        )
     return res
+
 
 def split(df, time_col, end_train_time, end_test_time):
     train = df[df[time_col] <= end_train_time]
@@ -154,6 +163,7 @@ def compute_metric(res, test, id_col, time_col, dependent_var):
     error = mean_squared_error(res["prediction"], res[dependent_var])
     return error
 
+
 # TODO: fix fail if n_folds == 1
 def get_splitter(df, time_col, test_mode, n_periods, number_predictions, log):
     time_frame = pd.DataFrame({time_col: pd.Series(df[time_col].unique())})
@@ -177,7 +187,7 @@ def get_splitter(df, time_col, test_mode, n_periods, number_predictions, log):
 
     elif test_mode == "split":
         splitter = []
-        number_test_records = number_predictions*n_periods
+        number_test_records = number_predictions * n_periods
         train_indexes = df.index[df[time_col].isin(time_frame[time_col][:-number_test_records])]
         test_indexes = df.index[df[time_col].isin(time_frame[time_col][-number_test_records:])]
         splitter.append((train_indexes, test_indexes))
@@ -185,11 +195,14 @@ def get_splitter(df, time_col, test_mode, n_periods, number_predictions, log):
     else:
         splitter = []
 
-    log.info('number of splits = {}'.format(len(splitter)))
+    log.info("number of splits = {}".format(len(splitter)))
     i = 0
     for train_indexes, test_indexes in splitter:
-        log.info('split {} train end = {} | test end = {}'.format(i,df.iloc[train_indexes][time_col].max(), df.iloc[test_indexes][time_col].max()))
+        log.info(
+            "split {} train end = {} | test end = {}".format(
+                i, df.iloc[train_indexes][time_col].max(), df.iloc[test_indexes][time_col].max()
+            )
+        )
         i += 1
 
-    
     return splitter

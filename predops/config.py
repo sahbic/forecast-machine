@@ -20,11 +20,12 @@ def init_config(PROJECT_KEY):
     # Directories
     BASE_DIR = Path(__file__).parent.parent.absolute()
     # CONFIG_DIR = Path(BASE_DIR, "config")
-    LOGS_DIR = Path(BASE_DIR, "logs", PROJECT_KEY)
-    RAW_DIR = Path(BASE_DIR, "raw", PROJECT_KEY)
-    DATA_DIR = Path(BASE_DIR, "data", PROJECT_KEY)
+    DATA_DIR = Path(BASE_DIR, "data/processed", PROJECT_KEY)
+    LOGS_DIR = Path(BASE_DIR, "data/logs", PROJECT_KEY)
+    RAW_DIR = Path(BASE_DIR, "data/raw", PROJECT_KEY)
+    
     # MODEL_DIR = Path(BASE_DIR, "model")
-    STORES_DIR = Path(BASE_DIR, "stores", PROJECT_KEY)
+    STORES_DIR = Path(BASE_DIR, "data/stores", PROJECT_KEY)
 
     # # Local stores
     # BLOB_STORE = Path(STORES_DIR, "blob")

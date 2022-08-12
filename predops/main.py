@@ -10,9 +10,13 @@ import pandas as pd
 
 from importlib import import_module
 
-from src import funcs
-from src.models import Last, Mean, MeanTS, RandomForest
-from src.models import ViyaGradientBoosting, ViyaDecisionTree, ViyaMLPA
+from predops import funcs
+from predops.models import Last, Mean, MeanTS, RandomForest
+from predops.models import ViyaGradientBoosting, ViyaDecisionTree, ViyaMLPA
+
+# TODO
+# put this in a config file, or as a parameter
+N_ITERATIONS = 10
 
 
 def load_base(work_dir_path, input_file_name, log):
@@ -21,12 +25,14 @@ def load_base(work_dir_path, input_file_name, log):
     base = pd.read_csv(file_path)
     return base
 
+
 def get_segments_list(base, segment_groupby_column):
     if segment_groupby_column:
         segments_list = base[segment_groupby_column].unique()
     else:
         segments_list = ["all"]
     return segments_list
+
 
 def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
     ratio_prediction = int(number_predictions / n_predictions_groupby)
@@ -37,6 +43,7 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
     )
     return prediction_horizon_list
 
+
 # TODO: use yaml config file for each project
 def get_models(id_col, time_col, dependent_var, log):
     models = {
@@ -44,7 +51,9 @@ def get_models(id_col, time_col, dependent_var, log):
             Last(id_col, time_col, dependent_var, log),
             Mean(id_col, time_col, dependent_var, log),
             MeanTS(id_col, time_col, dependent_var, log),
-            RandomForest(id_col, time_col, dependent_var, log)
+            RandomForest(id_col, time_col, dependent_var, log),
+            ViyaDecisionTree(id_col, time_col, dependent_var, log),
+            ViyaGradientBoosting(id_col, time_col, dependent_var, log)
         ]
     }
     # models = {
@@ -56,6 +65,7 @@ def get_models(id_col, time_col, dependent_var, log):
     # }
     return models
 
+
 def delete_experiment(experiment_name: str):
     """Delete an experiment with name `experiment_name`.
     Args:
@@ -64,6 +74,7 @@ def delete_experiment(experiment_name: str):
     mlflow_client = mlflow.tracking.MlflowClient()
     experiment_id = mlflow_client.get_experiment_by_name(experiment_name).experiment_id
     mlflow_client.delete_experiment(experiment_id=experiment_id)
+
 
 # TODO:
 # - what to do if no input ?
@@ -81,11 +92,11 @@ def train(
     work_dir_path,
     input_file_name,
     stores_dir,
-    log
+    log,
 ):
 
-    custom = import_module("scripts." + project_key + ".prepare")
-    
+    custom = import_module("predops.datasets." + project_key + ".prepare")
+
     base = load_base(work_dir_path, input_file_name, log)
     base[time_col] = pd.to_datetime(base[time_col])
     prediction_horizon_list = get_prediction_horizon_list(number_predictions, n_predictions_groupby)
@@ -108,7 +119,9 @@ def train(
 
         # generate grid, add temporal features with prediction horizon
         log.info("generate grid table")
-        grid_ph = custom.generate_grid(base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log)
+        grid_ph = custom.generate_grid(
+            base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log
+        )
 
         # iterate over segments
         for segment in segments_list:
@@ -124,8 +137,10 @@ def train(
 
             # get CV indexes
             grid_ph_seg = grid_ph_seg.reset_index()
-            tscv = funcs.get_splitter(grid_ph_seg, time_col, test_mode, n_periods, number_predictions, log)
-            
+            tscv = funcs.get_splitter(
+                grid_ph_seg, time_col, test_mode, n_periods, number_predictions, log
+            )
+
             # Start experiment
             model_name = project_key + "_" + segment + "_" + str(predict_horizon)
             mlflow.set_experiment(model_name)
@@ -143,15 +158,15 @@ def train(
                         log.info("training " + model.name)
 
                         tags = {
-                            "segment" : segment,
+                            "segment": segment,
                             "prediction_horizon": predict_horizon,
                             "model_name": model.name,
-                            "n_grid_features": grid_ph_seg.shape[1]
+                            "n_grid_features": grid_ph_seg.shape[1],
                         }
-                        
+
                         start_time = time.time()
                         # train model (with cross val search)
-                        model.tune_fit(grid_ph_seg, tscv, 3)
+                        model.tune_fit(grid_ph_seg, tscv, N_ITERATIONS)
                         # print duration
                         log.info("--- {0:.4f} seconds ---".format(time.time() - start_time))
                         # get and track cross validation results
@@ -165,7 +180,7 @@ def train(
                 output_format="pandas",
             )
 
-            run_id = df.loc[df['metrics.average_mse'].idxmin()]['run_id']
+            run_id = df.loc[df["metrics.average_mse"].idxmin()]["run_id"]
             results[model_name] = mlflow.get_run(run_id).to_dictionary()
             scores.append(mlflow.get_run(run_id).data.metrics["average_mse"])
 
@@ -174,15 +189,10 @@ def train(
             except mlflow.exceptions.MlflowException:
                 pass
 
-            result = mlflow.register_model(
-                    "runs:/{}/model".format(run_id),
-                    model_name
-                )
+            result = mlflow.register_model("runs:/{}/model".format(run_id), model_name)
 
             mlflow_client.transition_model_version_stage(
-                name=model_name,
-                version=1,
-                stage="Production"
+                name=model_name, version=1, stage="Production"
             )
 
     # Mean of all test error means
@@ -199,23 +209,19 @@ def train(
         # Track input file
         mlflow.log_artifact(f"{work_dir_path / input_file_name}")
 
-        # Track parameters    
+        # Track parameters
         parameters = {
-            "number_predictions" : number_predictions,
-            "n_predictions_groupby" : n_predictions_groupby,
-            "column_segment_groupby" : segment_groupby_column,
+            "number_predictions": number_predictions,
+            "n_predictions_groupby": n_predictions_groupby,
+            "column_segment_groupby": segment_groupby_column,
             "test_mode": test_mode,
-            "n_periods" : n_periods
+            "n_periods": n_periods,
         }
         mlflow.log_params(parameters)
 
         # Track column names
-        tags = {
-            "id_column" : id_col,
-            "time_column" : time_col,
-            "target" : dependent_var
-        }
-        mlflow.set_tags(tags) 
+        tags = {"id_column": id_col, "time_column": time_col, "target": dependent_var}
+        mlflow.set_tags(tags)
 
         # Track metrics
         mlflow.log_metric("average_cv_mse", mean_error_means)
@@ -229,32 +235,25 @@ def train(
 
     return
 
+
 # TODO:
 # - attention si best run utilise preparation de données différentes de l'implem actuelle ?
 # - what to do if no train ?
-def backtest(
-    project_key,
-    run_id,
-    n_folds,
-    work_dir_path,
-    input_file_name,
-    log
-):
-    custom = import_module("scripts." + project_key + ".prepare")
+def backtest(project_key, run_id, n_folds, work_dir_path, input_file_name, log):
+    custom = import_module("predops.datasets." + project_key + ".prepare")
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow_client = mlflow.tracking.MlflowClient()
     experiment_id = mlflow_client.get_experiment_by_name(project_key).experiment_id
 
     if not run_id:
-    # get best run
+        # get best run
         df = mlflow.search_runs(
             experiment_ids=experiment_id,
             order_by=["metric.average_cv_mse"],
             output_format="pandas",
         )
-        run_id = df.loc[df['metrics.average_cv_mse'].idxmin()]['run_id']
-
+        run_id = df.loc[df["metrics.average_cv_mse"].idxmin()]["run_id"]
 
     log.info("Selected run for backtest: {}".format(run_id))
     models_file = mlflow.get_run(run_id).info.artifact_uri + "/final_models.json"
@@ -265,7 +264,11 @@ def backtest(
     dependent_var = mlflow.get_run(run_id).data.tags["target"]
     number_predictions = int(mlflow.get_run(run_id).data.params["number_predictions"])
     n_predictions_groupby = int(mlflow.get_run(run_id).data.params["n_predictions_groupby"])
-    segment_groupby_column = None if mlflow.get_run(run_id).data.params["column_segment_groupby"] == 'None' else mlflow.get_run(run_id).data.params["column_segment_groupby"]
+    segment_groupby_column = (
+        None
+        if mlflow.get_run(run_id).data.params["column_segment_groupby"] == "None"
+        else mlflow.get_run(run_id).data.params["column_segment_groupby"]
+    )
 
     base = load_base(work_dir_path, input_file_name, log)
     base[time_col] = pd.to_datetime(base[time_col])
@@ -274,7 +277,6 @@ def backtest(
 
     splitter = funcs.get_splitter(base, time_col, "cv", n_folds, number_predictions, log)
 
-
     fold_scores_train, fold_scores_test = [], []
     test_set, train_set = pd.DataFrame(), pd.DataFrame()
 
@@ -282,13 +284,11 @@ def backtest(
 
     for train_indexes, test_indexes in splitter:
         fold_idx += 1
-        log.info("------------------------ " + "fold_id " +  str(fold_idx))
+        log.info("------------------------ " + "fold_id " + str(fold_idx))
         end_train_time = base.iloc[train_indexes][time_col].max()
         end_test_time = base.iloc[test_indexes][time_col].max()
         log.info(
-            "train end date {} / test date end {}".format(
-                str(end_train_time), str(end_test_time)
-            )
+            "train end date {} / test date end {}".format(str(end_train_time), str(end_test_time))
         )
 
         # concat test sets for later evaluation
@@ -307,15 +307,17 @@ def backtest(
             )
             end_test_time_group = end_train_time + custom.get_offset(predict_horizon)
             log.info(
-                "valid_ph begin " +
-                str(begin_test_time_group) +
-                " valid_ph end " +
-                str(end_test_time_group),
+                "valid_ph begin "
+                + str(begin_test_time_group)
+                + " valid_ph end "
+                + str(end_test_time_group),
             )
 
             # generate grid, add temporal features with prediction horizon
             log.info("generate grid table")
-            grid_ph = custom.generate_grid(base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log)
+            grid_ph = custom.generate_grid(
+                base, id_col, time_col, dependent_var, predict_horizon, work_dir_path, log
+            )
 
             res_segments_test, res_segments_train = pd.DataFrame(), pd.DataFrame()
 
@@ -345,7 +347,9 @@ def backtest(
                 # get child run id from model details file
                 child_run_id = models_details[model_name]["info"]["run_id"]
                 # fetch and open the model pickle
-                model_path = mlflow.get_run(child_run_id).info.artifact_uri + "/model/python_model.pkl"
+                model_path = (
+                    mlflow.get_run(child_run_id).info.artifact_uri + "/model/python_model.pkl"
+                )
                 model = pickle.load(open(model_path, "rb"))
                 # fit the model on current data using the best paranmeters
                 model.fit_with_params(train)
@@ -362,15 +366,17 @@ def backtest(
             res_tgroups_train = pd.concat([res_tgroups_train, res_segments_train])
 
         # compute fold error
-        test_error = funcs.compute_metric(res_tgroups_test, test_set, id_col, time_col, dependent_var)
-        train_error = funcs.compute_metric(res_tgroups_train, train_set, id_col, time_col, dependent_var)
+        test_error = funcs.compute_metric(
+            res_tgroups_test, test_set, id_col, time_col, dependent_var
+        )
+        train_error = funcs.compute_metric(
+            res_tgroups_train, train_set, id_col, time_col, dependent_var
+        )
         # compute fold results
         fold_scores_test.append(test_error)
         fold_scores_train.append(train_error)
 
-    log.info(
-        "=> train fold errors " + str(["{:.3f}".format(error) for error in fold_scores_train])
-    )
+    log.info("=> train fold errors " + str(["{:.3f}".format(error) for error in fold_scores_train]))
     log.info("=> train mean error " + "{:.6f}".format(np.mean(fold_scores_train)))
     log.info("=> test fold errors " + str(["{:.3f}".format(error) for error in fold_scores_test]))
     log.info("=> test mean error " + "{:.6f}".format(np.mean(fold_scores_test)))

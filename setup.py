@@ -15,7 +15,7 @@ test_packages = [
 ]
 
 dev_packages = [
-    "black==20.8b1",
+    "black==22.6.0",
     "flake8==3.8.3",
     "isort==5.5.3",
     "jupyterlab==2.2.8",
@@ -32,6 +32,7 @@ docs_packages = [
 setup(
     name="predops",
     version="0.1",
+    packages=["predops"],
     license="MIT",
     description="Forecast tool",
     author="sahbic",
@@ -57,7 +58,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "predops = app.cli:app",
+            "predops = predops.cli:app",
         ],
     },
 )

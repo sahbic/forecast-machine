@@ -7,9 +7,10 @@ from importlib import import_module
 
 from enum import Enum
 
-from src import config, main
+from predops import config, main
 
 app = typer.Typer()
+
 
 @app.command()
 def download_data(project_key: str):
@@ -21,15 +22,20 @@ def download_data(project_key: str):
     config.init_config(project_key)
 
     try:
-        download = import_module("scripts." + project_key + ".download")
+        download = import_module("predops.datasets." + project_key + ".download")
         download.get_data(config.RAW_DIR)
         config.logger.info("Data downloaded!")
     except ModuleNotFoundError:
         config.logger.error("The download script must be implemented for this project")
-    
+
 
 @app.command()
-def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--sample"), time_column: str = "date", output_file: str = "abt.csv"):
+def generate_base_file(
+    project_key: str,
+    sample: bool = typer.Option(False, "--sample"),
+    time_column: str = "date",
+    output_file: str = "abt.csv",
+):
     """Generate base file from raw data.
 
     Args:
@@ -41,15 +47,21 @@ def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--s
     config.init_config(project_key)
 
     try:
-        prepare = import_module("scripts." + project_key + ".prepare")
-        prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file)
-        config.logger.info("Data transformed, base file generated in {}".format(str(config.DATA_DIR / output_file)))
+        prepare = import_module("predops.datasets." + project_key + ".prepare")
+        prepare.generate_base(
+            config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file
+        )
+        config.logger.info(
+            "Data transformed, base file generated in {}".format(str(config.DATA_DIR / output_file))
+        )
     except ModuleNotFoundError:
         config.logger.error("The prepare script must be implemented for this project")
+
 
 class TestMode(str, Enum):
     split = "split"
     cv = "cv"
+
 
 @app.command()
 def train(
@@ -99,9 +111,11 @@ def train(
         config.DATA_DIR,
         input_file_name,
         config.STORES_DIR,
-        config.logger)
-    
+        config.logger,
+    )
+
     config.logger.info("Training completed")
+
 
 # TODO: add a retrain option
 # if not retrain train on first period and predict on all others
@@ -115,15 +129,10 @@ def backtest(
     config.init_config(project_key)
     config.logger.info("Start backtesting")
 
-    main.backtest(
-        project_key,
-        run_id,
-        n_periods,
-        config.DATA_DIR,
-        input_file_name,
-        config.logger)
-    
+    main.backtest(project_key, run_id, n_periods, config.DATA_DIR, input_file_name, config.logger)
+
     config.logger.info("Backtesting completed")
+
 
 if __name__ == "__main__":
     app()

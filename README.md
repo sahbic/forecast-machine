@@ -27,8 +27,6 @@ The project will implement the following MLOps practices (CI/CD/CT) :
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-# On windows powershell
-# .\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
 pip install -e .
 ```
@@ -73,3 +71,4 @@ mlflow ui --backend-store-uri "sqlite:///mlflow.db"
 - [M5 Competition 4th place](https://github.com/monsaraida/kaggle-m5-forecasting-accuracy-4th-place)
 - [Kaggle discussion](https://www.kaggle.com/c/m5-forecasting-accuracy/discussion/163216)
 - Best practices of developement from [madewithml repository](https://github.com/GokuMohandas/applied-ml)
+- [Monash Time Series Forecasting Archive](https://github.com/rakshitha123/TSForecasting)

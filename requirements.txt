@@ -1,13 +1,13 @@
 numpy==1.20.1
-pandas==1.2.2
-swat==1.6.1
-pipefitter==1.0.0
+pandas==1.4.3
+swat==1.9.3
+pipefitter @ https://github.com/sassoftware/python-pipefitter/archive/d3199b72dfd66729753da50e9e15eb303361ee8a.zip
 python-dotenv==0.15.0
-scikit-learn==0.24.1
+scikit-learn==1.1.2
 python-slugify==4.0.1
 openpyxl==3.0.6
-typer==0.3.2
+typer==0.6.1
 kaggle==1.5.12
 pretty-errors==1.2.19
 rich==9.9.0
-mlflow==1.15.0
+mlflow==1.28.0

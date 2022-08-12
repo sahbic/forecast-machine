@@ -47,7 +47,7 @@ class Model(mlflow.pyfunc.PythonModel):
         return np.zeros(len(test))
 
     def track(self, exp_id, tags, test_mode, n_periods):
-        for i in range(len(self.cv_results['mean_test_score'])):
+        for i in range(len(self.cv_results["mean_test_score"])):
             # Start run
             with mlflow.start_run(run_name=self.name, nested=True):
                 # Track parameters
@@ -62,15 +62,19 @@ class Model(mlflow.pyfunc.PythonModel):
 
                 if test_mode == "cv":
                     for j in range(n_periods):
-                        mlflow.log_metric("split" + str(j) + "_test_score", self.cv_results["split" + str(j) + "_test_score"][i])
+                        mlflow.log_metric(
+                            "split" + str(j) + "_test_score",
+                            self.cv_results["split" + str(j) + "_test_score"][i],
+                        )
 
                 # Track extra data related to the experiment
-                mlflow.set_tags(tags) 
+                mlflow.set_tags(tags)
 
                 # Log model
                 if self.conda_env:
-                    mlflow.pyfunc.log_model(artifact_path="model", python_model=self, conda_env=self.conda_env)
-
+                    mlflow.pyfunc.log_model(
+                        artifact_path="model", python_model=self, conda_env=self.conda_env
+                    )
 
 
 class Mean(Model):
@@ -81,16 +85,16 @@ class Mean(Model):
         self.best_params = None
         self.best_index = None
         self.conda_env = {
-            'name': 'pandas-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1'
-            ]
+            "name": "pandas-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+            ],
         }
-    
+
     def get_name(self):
         return self.name
 
@@ -144,14 +148,14 @@ class MeanTS(Model):
         self.best_params = None
         self.best_index = None
         self.conda_env = {
-            'name': 'pandas-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1'
-            ]
+            "name": "pandas-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+            ],
         }
 
     def get_name(self):
@@ -167,7 +171,7 @@ class MeanTS(Model):
         res = test.loc[:, [self.id_col, self.time_col]]
         res = res.merge(self.means, on=self.id_col, how="left")
         return res
-    
+
     def fit_with_params(self, df):
         self.fit(df)
 
@@ -210,14 +214,14 @@ class Last(Model):
         self.best_params = None
         self.best_index = None
         self.conda_env = {
-            'name': 'pandas-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1'
-            ]
+            "name": "pandas-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+            ],
         }
 
     def get_name(self):
@@ -272,26 +276,24 @@ class RandomForest(Model):
         self.model = None
         self.best_params = None
         self.best_index = None
+        # TODO
+        # Change this requirements dynamically ?
         self.parameters_space = {
-            "model__n_estimators": [50],
-            "model__max_features": ["auto", "sqrt", "log2"],
+            "model__n_estimators": [100],
+            "model__max_features": ["sqrt", "log2", 1.0],
             "model__min_samples_split": [2, 5, 10],
-            "model__max_depth": [3, 5, 10, None],
-            "model__criterion": ["mse", "mae"],
+            "model__min_samples_leaf": [1, 5, 10],
+            "model__max_depth": [6, 12, None],
         }
-        # self.parameters_space = {
-        #     "model__n_estimators": [10],
-        #     "model__max_depth": [3]
-        # }
         self.conda_env = {
-            'name': 'sklearn-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'scikit-learn==0.24.1'
-            ]
+            "name": "sklearn-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "scikit-learn==0.24.1",
+            ],
         }
 
     def get_pipeline(self):
@@ -369,6 +371,7 @@ class RandomForest(Model):
         res["prediction"] = preds
         return res
 
+
 class ViyaModel(Model):
     def __init__(self, id_col, time_col, dependent_var, log):
         Model.__init__(self, id_col, time_col, dependent_var, log)
@@ -379,16 +382,16 @@ class ViyaModel(Model):
         self.best_index = None
         self.parameters_space = {}
         self.conda_env = {
-            'name': 'swat-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1',
-                'swat==1.6.1',
-                'pipefitter==1.0.0'
-            ]
+            "name": "swat-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+                "swat==1.6.1",
+                "pipefitter==1.0.0",
+            ],
         }
 
     def get_session(self):
@@ -412,21 +415,23 @@ class ViyaModel(Model):
         varnames = list(df.columns.values) + ["index"]
         rejected = [self.id_col, self.time_col, self.dependent_var, "index"]
         inputs = [item for item in varnames if item not in rejected]
-        
+
         return inputs
 
     def to_cv_results(self, df):
         columns = json.loads(df.to_json(orient="columns"))
         res = {}
-        res["mean_test_score"] = df['MeanScore'].values
-        res["std_test_score"] = df['ScoreStd'].values
+        res["mean_test_score"] = df["MeanScore"].values
+        res["std_test_score"] = df["ScoreStd"].values
         res["params"] = list(columns["Parameters"].values())
         for parameter in res["params"][0]:
             res["param_" + str(parameter)] = []
             for run in res["params"]:
                 res["param_" + str(parameter)].append(run[parameter])
         for i in range(len(list(df["FoldScores"][0]))):
-            res["split" + str(i) + "_test_score"] = [df["FoldScores"][j][i] for j in range(df["FoldScores"].shape[0])]
+            res["split" + str(i) + "_test_score"] = [
+                df["FoldScores"][j][i] for j in range(df["FoldScores"].shape[0])
+            ]
         return res
 
     def getToken(self):
@@ -437,18 +442,20 @@ class ViyaModel(Model):
         USER_NAME = os.getenv("USER_NAME")
         PASSWORD = os.getenv("PASSWORD")
 
-        url = "http://{}/SASLogon/oauth/token?grant_type=password&username={}&password={}".format(HOST_IP, USER_NAME, PASSWORD)
+        url = "http://{}/SASLogon/oauth/token?grant_type=password&username={}&password={}".format(
+            HOST_IP, USER_NAME, PASSWORD
+        )
 
-        payload={}
+        payload = {}
         headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic c2FzLmVjOg=='
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": "Basic c2FzLmVjOg==",
         }
 
         response = requests.request("GET", url, headers=headers, data=payload)
         dict_res = json.loads(response.text)
 
-        return("Bearer " + dict_res["access_token"])
+        return "Bearer " + dict_res["access_token"]
 
     def createMLPAProject(self, oauthToken, project_name, table_name, target):
 
@@ -458,23 +465,20 @@ class ViyaModel(Model):
         url = "http://{}/mlPipelineAutomation/projects".format(HOST_IP)
 
         headers = {
-            'Authorization': oauthToken,
-            'Accept': "application/vnd.sas.analytics.ml.pipeline.automation.project+json",
-            'Content-Type': "application/json"
+            "Authorization": oauthToken,
+            "Accept": "application/vnd.sas.analytics.ml.pipeline.automation.project+json",
+            "Content-Type": "application/json",
         }
         payload = {
-            'dataTableUri': '/dataTables/dataSources/cas~fs~cas-shared-default~fs~CASUSER({})/tables/'.format(USER_NAME) + table_name,
-            'type': 'predictive',
-            'name': project_name,
-            'description': 'Project generated for test',
-            'settings': {
-                'autoRun': True,
-                'modelingMode': 'Standard',
-                'maxModelingTime': 10
-            },
-            'analyticsProjectAttributes': {
-                'targetVariable': target
-            }
+            "dataTableUri": "/dataTables/dataSources/cas~fs~cas-shared-default~fs~CASUSER({})/tables/".format(
+                USER_NAME
+            )
+            + table_name,
+            "type": "predictive",
+            "name": project_name,
+            "description": "Project generated for test",
+            "settings": {"autoRun": True, "modelingMode": "Standard", "maxModelingTime": 10},
+            "analyticsProjectAttributes": {"targetVariable": target},
         }
 
         payload_data = json.dumps(payload, indent=4)
@@ -494,21 +498,22 @@ class ViyaGradientBoosting(ViyaModel):
         self.best_params = None
         self.best_index = None
         self.parameters_space = dict(
-            max_depth=[3,5],
-            leaf_size=[3,5],
-            n_trees=[50]
+            max_depth=[4, 6, 10],
+            leaf_size=[3, 5],
+            n_bins = [5, 20 , 50],
+            n_trees=[100]
         )
         self.conda_env = {
-            'name': 'swat-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1',
-                'swat==1.6.1',
-                'pipefitter==1.0.0'
-            ]
+            "name": "swat-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+                "swat==1.6.1",
+                "pipefitter==1.0.0",
+            ],
         }
 
     def get_pipeline(self, df):
@@ -524,9 +529,9 @@ class ViyaGradientBoosting(ViyaModel):
     def fit_with_params(self, df):
 
         s = self.get_session()
-        table_name = "PREDOPS-TRAIN"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-TRAIN" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+        s.upload_frame(df, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
 
@@ -543,49 +548,56 @@ class ViyaGradientBoosting(ViyaModel):
     def tune_fit(self, df, splitter, n_iter):
 
         s = self.get_session()
-        table_name = "PREDOPS-SEARCH"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-SEARCH" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+        s.upload_frame(df, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
 
         pipe = self.get_pipeline(df)
 
-        generator = ((castbl.query('index in ({})'.format(str(list(splitter[i][0]))[1:-1])) ,castbl.query('index in ({})'.format(str(list(splitter[i][1]))[1:-1]))) for i in range(len(splitter)))
+        generator = (
+            (
+                castbl.query("index in ({})".format(str(list(splitter[i][0]))[1:-1])),
+                castbl.query("index in ({})".format(str(list(splitter[i][1]))[1:-1])),
+            )
+            for i in range(len(splitter))
+        )
 
-        hpt = HyperParameterTuning(
-          estimator=pipe,
-          param_grid=self.parameters_space, 
-          cv=generator)
+        hpt = HyperParameterTuning(estimator=pipe, param_grid=self.parameters_space, cv=generator)
         # TODO: Viya n_jobs in config parameters
         search = hpt.gridsearch(castbl).reset_index()
 
         # self.model = hpt
         # TODO: save table name in order to be able to score
         # Does the hpt retrain the model on all folds ?
-        self.best_index = search['MeanScore'].idxmin()
-        self.best_params = search.loc[self.best_index,"Parameters"]
-        self.cv_results = self.to_cv_results(search) 
+        self.best_index = search["MeanScore"].idxmin()
+        self.best_params = search.loc[self.best_index, "Parameters"]
+        self.cv_results = self.to_cv_results(search)
 
         s.table.dropTable(name=table_name, quiet="True")
         s.terminate()
 
     def predict(self, test):
         s = self.get_session()
-        table_name = "PREDOPS-TEST"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-TEST" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(test, casout=dict(name=table_name,promote=True))
+        s.upload_frame(test, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
         model_table = self.model.stages[0].data
 
-        s.loadactionset('decisiontree')
+        s.loadactionset("decisiontree")
         s.table.dropTable("KSCORE", quiet="True")
-        r = castbl.decisiontree.gbtreescore(modeltable=model_table, copyvars=[self.id_col, self.time_col, self.dependent_var],casout={"name":"KSCORE","promote":"True"})
+        r = castbl.decisiontree.gbtreescore(
+            modeltable=model_table,
+            copyvars=[self.id_col, self.time_col, self.dependent_var],
+            casout={"name": "KSCORE", "promote": "True"},
+        )
 
         res = s.CASTable("KSCORE").to_frame()
-        res.rename(columns={"_DT_PredMean_":"prediction"}, inplace=True)
-        res = res[[self.id_col, self.time_col,"prediction"]]
+        res.rename(columns={"_DT_PredMean_": "prediction"}, inplace=True)
+        res = res[[self.id_col, self.time_col, "prediction"]]
         res[self.time_col] = pd.to_datetime(res[self.time_col])
 
         s.table.dropTable(name=table_name, quiet="True")
@@ -603,20 +615,21 @@ class ViyaDecisionTree(ViyaModel):
         self.best_params = None
         self.best_index = None
         self.parameters_space = dict(
-            max_depth=[2],
-            leaf_size=[3],
+            max_depth=[4, 6, 10],
+            leaf_size=[3, 5],
+            n_bins = [5, 20 , 50]
         )
         self.conda_env = {
-            'name': 'swat-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1',
-                'swat==1.6.1',
-                'pipefitter==1.0.0'
-            ]
+            "name": "swat-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+                "swat==1.6.1",
+                "pipefitter==1.0.0",
+            ],
         }
 
     def get_pipeline(self, df):
@@ -632,9 +645,9 @@ class ViyaDecisionTree(ViyaModel):
     def fit_with_params(self, df):
 
         s = self.get_session()
-        table_name = "PREDOPS-TRAIN"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-TRAIN" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+        s.upload_frame(df, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
 
@@ -651,55 +664,63 @@ class ViyaDecisionTree(ViyaModel):
     def tune_fit(self, df, splitter, n_iter):
 
         s = self.get_session()
-        table_name = "PREDOPS-SEARCH"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-SEARCH" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df, casout=dict(name=table_name,promote=True))
+        s.upload_frame(df, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
 
         pipe = self.get_pipeline(df)
 
-        generator = ((castbl.query('index in ({})'.format(str(list(splitter[i][0]))[1:-1])) ,castbl.query('index in ({})'.format(str(list(splitter[i][1]))[1:-1]))) for i in range(len(splitter)))
+        generator = (
+            (
+                castbl.query("index in ({})".format(str(list(splitter[i][0]))[1:-1])),
+                castbl.query("index in ({})".format(str(list(splitter[i][1]))[1:-1])),
+            )
+            for i in range(len(splitter))
+        )
 
-        hpt = HyperParameterTuning(
-          estimator=pipe,
-          param_grid=self.parameters_space, 
-          cv=generator)
+        hpt = HyperParameterTuning(estimator=pipe, param_grid=self.parameters_space, cv=generator)
         # TODO: Viya n_jobs in config parameters
         search = hpt.gridsearch(castbl).reset_index()
 
         # self.model = hpt
         # TODO: save table name in order to be able to score
         # Does the hpt retrain the model on all folds ?
-        self.best_index = search['MeanScore'].idxmin()
-        self.best_params = search.loc[self.best_index,"Parameters"]
-        self.cv_results = self.to_cv_results(search) 
+        self.best_index = search["MeanScore"].idxmin()
+        self.best_params = search.loc[self.best_index, "Parameters"]
+        self.cv_results = self.to_cv_results(search)
 
         s.table.dropTable(name=table_name, quiet="True")
         s.terminate()
 
     def predict(self, test):
         s = self.get_session()
-        table_name = "PREDOPS-TEST"+"-"+ str(uuid.uuid4())
+        table_name = "PREDOPS-TEST" + "-" + str(uuid.uuid4())
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(test, casout=dict(name=table_name,promote=True))
+        s.upload_frame(test, casout=dict(name=table_name, promote=True))
 
         castbl = s.CASTable(table_name)
         model_table = self.model.stages[0].data
 
-        s.loadactionset('decisiontree')
+        s.loadactionset("decisiontree")
         s.table.dropTable("KSCORE", quiet="True")
-        r = castbl.decisiontree.dtreescore(modeltable=model_table, copyvars=[self.id_col, self.time_col, self.dependent_var],casout={"name":"KSCORE","promote":"True"})
+        r = castbl.decisiontree.dtreescore(
+            modeltable=model_table,
+            copyvars=[self.id_col, self.time_col, self.dependent_var],
+            casout={"name": "KSCORE", "promote": "True"},
+        )
 
         res = s.CASTable("KSCORE").to_frame()
-        res.rename(columns={"_DT_PredMean_":"prediction"}, inplace=True)
-        res = res[[self.id_col, self.time_col,"prediction"]]
+        res.rename(columns={"_DT_PredMean_": "prediction"}, inplace=True)
+        res = res[[self.id_col, self.time_col, "prediction"]]
         res[self.time_col] = pd.to_datetime(res[self.time_col])
 
         s.table.dropTable(name=table_name, quiet="True")
         s.terminate()
 
         return res
+
 
 class ViyaMLPA(ViyaModel):
     def __init__(self, id_col, time_col, dependent_var, log):
@@ -710,16 +731,16 @@ class ViyaMLPA(ViyaModel):
         self.best_params = None
         self.best_index = None
         self.conda_env = {
-            'name': 'swat-env',
-            'channels': ['defaults'],
-            'dependencies': [
-                'python=3.9.2',
-                'cloudpickle==1.6.0',
-                'pandas==1.2.2',
-                'numpy==1.20.1',
-                'swat==1.6.1',
-                'pipefitter==1.0.0'
-            ]
+            "name": "swat-env",
+            "channels": ["defaults"],
+            "dependencies": [
+                "python=3.9.2",
+                "cloudpickle==1.6.0",
+                "pandas==1.2.2",
+                "numpy==1.20.1",
+                "swat==1.6.1",
+                "pipefitter==1.0.0",
+            ],
         }
 
     def fit_with_params(self, df):
@@ -728,8 +749,10 @@ class ViyaMLPA(ViyaModel):
     def tune_fit(self, df, splitter, n_iter):
 
         s = self.get_session()
-        table_name = "PREDOPS-SEARCH"+"-"+ str(uuid.uuid4())
-        project_name = "PREDOPS_MLPA" + str(random.randint(1,100)) + random.choice(string.ascii_letters)
+        table_name = "PREDOPS-SEARCH" + "-" + str(uuid.uuid4())
+        project_name = (
+            "PREDOPS_MLPA" + str(random.randint(1, 100)) + random.choice(string.ascii_letters)
+        )
         # table_name = project_name + "_TRAIN"
 
         train_idx = list(splitter[0][0])
@@ -740,20 +763,22 @@ class ViyaMLPA(ViyaModel):
         df.loc[test_idx, "_PARTIND_"] = 0
 
         s.table.dropTable(name=table_name, quiet="True")
-        s.upload_frame(df ,casout=dict(name=table_name,promote=True))
+        s.upload_frame(df, casout=dict(name=table_name, promote=True))
 
         var_list = list()
         # for col in self.get_inputs(df):
         #     var_list.append({"name" : col})
-        for col in ["wday","sell_price","last","_PARTIND_"]:
-            var_list.append({"name" : col})
-        var_list.append({"name" : self.dependent_var})
+        for col in ["wday", "sell_price", "last", "_PARTIND_"]:
+            var_list.append({"name": col})
+        var_list.append({"name": self.dependent_var})
 
         print(var_list)
 
         s.table.dropTable(name=project_name + "_TRAIN", quiet="True")
-        s.table.partition(table={'name' : table_name, "vars" : var_list}, 
-                                 casout={'name' : project_name + "_TRAIN", 'promote' : True})
+        s.table.partition(
+            table={"name": table_name, "vars": var_list},
+            casout={"name": project_name + "_TRAIN", "promote": True},
+        )
 
         # -----------------------------------------------
         # Get authentication token
@@ -765,7 +790,9 @@ class ViyaMLPA(ViyaModel):
         # REST request for creating MLPA project
         # -----------------------------------------------
 
-        mlpaProject = self.createMLPAProject(oauthToken, project_name, project_name + "_TRAIN", self.dependent_var)
+        mlpaProject = self.createMLPAProject(
+            oauthToken, project_name, project_name + "_TRAIN", self.dependent_var
+        )
 
         self.log.info(mlpaProject)
 
@@ -774,7 +801,6 @@ class ViyaMLPA(ViyaModel):
         # -----------------------------------------------
 
         # projectStateLink = list(filter(lambda x: x["rel"] == "state", mlpaProject["links"]))[0]
-
 
         s.table.dropTable(name=table_name, quiet="True")
         s.terminate()

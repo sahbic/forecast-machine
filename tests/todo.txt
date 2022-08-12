@@ -1,3 +1,7 @@
 - CLI:
 
 ensure id is unique or test what happens if not ?
+
+test swat connection ?
+
+test a RandomForest sklearn with the set of params (the params can change between sklearn versions)

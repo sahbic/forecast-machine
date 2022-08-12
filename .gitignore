@@ -11,14 +11,13 @@ mlflow.db
 mlflow.db.backup
 
 # project specific scripts
-!scripts/
-scripts/*
-!scripts/m5a/
+# !predops/datasets/
+# predops/datasets/*
+# !predops/datasets/m5a/
 
 # specific
 notebooks
 output
-/src/functions/*
 
 # kaggle
 .kaggle
