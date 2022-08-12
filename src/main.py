@@ -8,6 +8,8 @@ from mlflow.entities import ViewType
 import numpy as np
 import pandas as pd
 
+from importlib import import_module
+
 from src import funcs
 from src.models import Last, Mean, MeanTS, RandomForest
 from src.models import ViyaGradientBoosting, ViyaDecisionTree, ViyaMLPA
@@ -37,19 +39,21 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
 
 # TODO: use yaml config file for each project
 def get_models(id_col, time_col, dependent_var, log):
-    # models = {
-    #     "ph_models": [
-    #         Last(id_col, time_col, dependent_var, log),
-    #         Mean(id_col, time_col, dependent_var, log),
-    #         MeanTS(id_col, time_col, dependent_var, log),
-    #         ViyaDecisionTree(id_col, time_col, dependent_var, log)
-    #     ]
-    # }
     models = {
         "ph_models": [
+            Last(id_col, time_col, dependent_var, log),
+            Mean(id_col, time_col, dependent_var, log),
+            MeanTS(id_col, time_col, dependent_var, log),
             RandomForest(id_col, time_col, dependent_var, log)
         ]
     }
+    # models = {
+    #     "ph_models": [
+    #         ViyaMLPA(id_col, time_col, dependent_var, log),
+    #         ViyaDecisionTree(id_col, time_col, dependent_var, log),
+    #         ViyaGradientBoosting(id_col, time_col, dependent_var, log)
+    #     ]
+    # }
     return models
 
 def delete_experiment(experiment_name: str):
@@ -79,10 +83,9 @@ def train(
     stores_dir,
     log
 ):
-    custom = __import__(
-        project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
-    )
 
+    custom = import_module("scripts." + project_key + ".prepare")
+    
     base = load_base(work_dir_path, input_file_name, log)
     base[time_col] = pd.to_datetime(base[time_col])
     prediction_horizon_list = get_prediction_horizon_list(number_predictions, n_predictions_groupby)
@@ -222,7 +225,7 @@ def train(
 
     # Mean of all test error means
     mean_error_means = np.mean(scores)
-    log.info(f"Mean of test error means: {mean_error_means:.2f}")
+    log.info(f"Mean of test error means: {mean_error_means:.4f}")
 
     return
 
@@ -237,9 +240,7 @@ def backtest(
     input_file_name,
     log
 ):
-    custom = __import__(
-        project_key + ".prepare", fromlist=["generate_grid", "get_offset"]
-    )
+    custom = import_module("scripts." + project_key + ".prepare")
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow_client = mlflow.tracking.MlflowClient()

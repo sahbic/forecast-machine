@@ -8,10 +8,14 @@ stores
 # mlflow
 mlruns
 mlflow.db
+mlflow.db.backup
+
+# project specific scripts
+!scripts/
+scripts/*
+!scripts/m5a/
 
 # specific
-src/main_bis.py
-
 notebooks
 output
 /src/functions/*

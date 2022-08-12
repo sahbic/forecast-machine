@@ -178,12 +178,18 @@ def get_splitter(df, time_col, test_mode, n_periods, number_predictions, log):
     elif test_mode == "split":
         splitter = []
         number_test_records = number_predictions*n_periods
-        train_indexes = df.index[:-number_test_records]
-        test_indexes = df.index[-number_test_records:]
+        train_indexes = df.index[df[time_col].isin(time_frame[time_col][:-number_test_records])]
+        test_indexes = df.index[df[time_col].isin(time_frame[time_col][-number_test_records:])]
         splitter.append((train_indexes, test_indexes))
 
     else:
         splitter = []
+
+    log.info('number of splits = {}'.format(len(splitter)))
+    i = 0
+    for train_indexes, test_indexes in splitter:
+        log.info('split {} train end = {} | test end = {}'.format(i,df.iloc[train_indexes][time_col].max(), df.iloc[test_indexes][time_col].max()))
+        i += 1
 
     
     return splitter

@@ -3,11 +3,11 @@
 
 from swat.utils.config import option_context
 import typer
+from importlib import import_module
 
 from enum import Enum
 
 from src import config, main
-from m5a import download, prepare
 
 app = typer.Typer()
 
@@ -19,8 +19,14 @@ def download_data(project_key: str):
         project_key (str): Project key for the organization of project specific files.
     """
     config.init_config(project_key)
-    download.get_data(config.RAW_DIR)
-    config.logger.info("Data downloaded!")
+
+    try:
+        download = import_module("scripts." + project_key + ".download")
+        download.get_data(config.RAW_DIR)
+        config.logger.info("Data downloaded!")
+    except ModuleNotFoundError:
+        config.logger.error("The download script must be implemented for this project")
+    
 
 @app.command()
 def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--sample"), time_column: str = "date", output_file: str = "abt.csv"):
@@ -33,8 +39,13 @@ def generate_base_file(project_key: str, sample: bool = typer.Option(False, "--s
         output_file (str, optional): Output file to generate in work directory. Defaults to "abt.csv".
     """
     config.init_config(project_key)
-    prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file)
-    config.logger.info("Data transformed, base file generated!")
+
+    try:
+        prepare = import_module("scripts." + project_key + ".prepare")
+        prepare.generate_base(config.RAW_DIR, config.DATA_DIR, time_column, config.logger, sample, output_file)
+        config.logger.info("Data transformed, base file generated in {}".format(str(config.DATA_DIR / output_file)))
+    except ModuleNotFoundError:
+        config.logger.error("The prepare script must be implemented for this project")
 
 class TestMode(str, Enum):
     split = "split"

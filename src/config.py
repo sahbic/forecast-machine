@@ -81,6 +81,11 @@ def init_config(PROJECT_KEY):
                 "level": logging.INFO,
                 "propagate": True,
             },
+            "alembic": {
+                "handlers": ["console", "info", "error"],
+                "level": logging.WARN,
+                "propagate": True,
+            },
         },
     }
 
