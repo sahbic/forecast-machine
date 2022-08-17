@@ -11,3 +11,4 @@ kaggle==1.5.12
 pretty-errors==1.2.19
 rich==9.9.0
 mlflow==1.28.0
+darts==0.21.0
