@@ -67,7 +67,7 @@ def extract_calendar_features(df, time_col, log):
     df["dayofweek"] = df[time_col].dt.dayofweek.astype(np.int8)
     df["weekend"] = (df["dayofweek"] >= 5).astype(np.int8)
     df["day"] = days
-    df["moon"] = df.date.apply(get_moon_phase)
+    df["moon"] = df[time_col].apply(get_moon_phase)
 
     df["hour"] = df[time_col].dt.hour
 

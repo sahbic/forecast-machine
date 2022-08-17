@@ -1,0 +1,5 @@
+project_key: kaggle_walmart
+# TODO:
+#   - add model hypoerparameters
+#   - add feature engineering
+#   - add optimization metric

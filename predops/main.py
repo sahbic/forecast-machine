@@ -46,15 +46,23 @@ def get_prediction_horizon_list(number_predictions, n_predictions_groupby):
 
 # TODO: use yaml config file for each project
 def get_models(id_col, time_col, dependent_var, log):
+    # models = {
+    #     "ph_models": [
+    #         Last(id_col, time_col, dependent_var, log),
+    #         Mean(id_col, time_col, dependent_var, log),
+    #         MeanTS(id_col, time_col, dependent_var, log),
+    #         RandomForest(id_col, time_col, dependent_var, log),
+    #         ViyaDecisionTree(id_col, time_col, dependent_var, log),
+    #         ViyaGradientBoosting(id_col, time_col, dependent_var, log)
+    #     ]
     models = {
-        "ph_models": [
-            Last(id_col, time_col, dependent_var, log),
-            Mean(id_col, time_col, dependent_var, log),
-            MeanTS(id_col, time_col, dependent_var, log),
-            RandomForest(id_col, time_col, dependent_var, log),
-            ViyaDecisionTree(id_col, time_col, dependent_var, log),
-            ViyaGradientBoosting(id_col, time_col, dependent_var, log)
-        ]
+    "ph_models": [
+        Mean(id_col, time_col, dependent_var, log),
+        MeanTS(id_col, time_col, dependent_var, log),
+        RandomForest(id_col, time_col, dependent_var, log),
+        ViyaDecisionTree(id_col, time_col, dependent_var, log),
+        ViyaGradientBoosting(id_col, time_col, dependent_var, log)
+    ]
     }
     # models = {
     #     "ph_models": [
